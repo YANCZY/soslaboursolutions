@@ -6,10 +6,10 @@ This repository contains the SOS Labour Solutions web application built with Lar
 
 Before installing, make sure you have:
 
-- PHP `8.3+`
-- Composer
-- Node.js `18+` and npm
-- SQLite
+- [Laravel Herd](https://herd.laravel.com/)
+- Node.js `18+`
+- pnpm
+- PostgreSQL
 
 ## Installation
 
@@ -20,19 +20,36 @@ git clone <your-repo-url>
 cd soslaboursolutions
 ```
 
-2. Install PHP dependencies.
+2. Make sure Laravel Herd is installed and running.
+
+Laravel Herd already covers the local PHP and Composer setup, so you do not need to install those separately in most cases.
+
+3. Make sure `pnpm` is installed.
+
+```bash
+pnpm --version
+```
+
+If `pnpm` is not installed yet, you can install it with Corepack:
+
+```bash
+corepack enable
+corepack prepare pnpm@latest --activate
+```
+
+4. Install PHP dependencies.
 
 ```bash
 composer install
 ```
 
-3. Install frontend dependencies.
+5. Install frontend dependencies with `pnpm`.
 
 ```bash
-npm install
+pnpm install
 ```
 
-4. Create your environment file.
+6. Create your environment file and configure PostgreSQL.
 
 ```bash
 cp .env.example .env
@@ -44,34 +61,26 @@ If you are on Windows PowerShell:
 Copy-Item .env.example .env
 ```
 
-5. Generate the application key.
+After that, update your `.env` file:
+
+```env
+DB_CONNECTION=pgsql
+DB_HOST=127.0.0.1
+DB_PORT=5432
+DB_DATABASE=your_database_name
+DB_USERNAME=your_database_user
+DB_PASSWORD=your_database_password
+```
+
+Make sure the PostgreSQL database already exists before continuing.
+
+7. Generate the application key.
 
 ```bash
 php artisan key:generate
 ```
 
-6. Configure the database.
-
-The project defaults to SQLite. Update `.env` if needed:
-
-```env
-DB_CONNECTION=sqlite
-DB_DATABASE=database/database.sqlite
-```
-
-If the SQLite file does not exist yet, create it:
-
-```bash
-touch database/database.sqlite
-```
-
-If you are on Windows PowerShell:
-
-```powershell
-New-Item database\database.sqlite -ItemType File
-```
-
-7. Run the database migrations.
+8. Run the database migrations.
 
 ```bash
 php artisan migrate
@@ -79,20 +88,24 @@ php artisan migrate
 
 ## Running The App
 
-Start the Laravel server and Vite development server in separate terminals:
+Before running the app, make sure Laravel Herd is open and the Herd PATH setup is enabled on your machine.
+
+Prerequisite:
+
+- Open Laravel Herd
+- Make sure Herd has added PHP and Composer to your system PATH
+- Make sure this project is parked or linked in Herd
+
+Start the frontend development server:
 
 ```bash
-php artisan serve
+pnpm run dev
 ```
 
-```bash
-npm run dev
-```
-
-Then open the local URL shown by Laravel, usually:
+Then open the app in your browser using the Herd local domain:
 
 ```text
-http://127.0.0.1:8000
+http://app_name.test
 ```
 
 ## One-Command Setup
@@ -109,8 +122,10 @@ This will:
 - create `.env` if it does not exist
 - generate the app key
 - run migrations
-- install npm dependencies
+- install frontend dependencies
 - build frontend assets
+
+The recommended frontend workflow for this project is still the manual `pnpm` setup shown above.
 
 ## Helpful Commands
 
@@ -123,16 +138,17 @@ php artisan test
 Format frontend files:
 
 ```bash
-npm run format
+pnpm run format
 ```
 
 Check frontend types:
 
 ```bash
-npm run types:check
+pnpm run types:check
 ```
 
 ## Notes
 
-- If you use MySQL or another database, update the `DB_*` values in `.env` before running migrations.
-- If `npm run build` or `npm run dev` fails on Windows because of native dependency issues, remove `node_modules` and reinstall dependencies.
+- Laravel Herd handles the local PHP environment, which makes setup simpler for Windows-based development.
+- If you use a database other than PostgreSQL, update the `DB_*` values in `.env` before running migrations.
+- If `pnpm run build` or `pnpm run dev` fails because of frontend dependency issues, remove `node_modules` and reinstall with `pnpm install`.
