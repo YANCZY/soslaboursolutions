@@ -19,7 +19,7 @@ const { isCurrentUrl } = useCurrentUrl();
 
 <template>
     <SidebarGroup class="px-2 py-0">
-        <SidebarGroupLabel>Platform</SidebarGroupLabel>
+        <SidebarGroupLabel>Home</SidebarGroupLabel>
         <SidebarMenu>
             <SidebarMenuItem v-for="item in items" :key="item.title">
                 <SidebarMenuButton
@@ -31,6 +31,14 @@ const { isCurrentUrl } = useCurrentUrl();
                         <component :is="item.icon" />
                         <span>{{ item.title }}</span>
                     </Link>
+                </SidebarMenuButton>
+            </SidebarMenuItem>
+        </SidebarMenu>
+        <SidebarGroupLabel class="mt-4">Workspace</SidebarGroupLabel>
+        <SidebarMenu>
+            <SidebarMenuItem>
+                <SidebarMenuButton disabled>
+                    <span>Client</span>
                 </SidebarMenuButton>
             </SidebarMenuItem>
         </SidebarMenu>
