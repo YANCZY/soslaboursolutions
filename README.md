@@ -96,11 +96,6 @@ Prerequisite:
 - Make sure Herd has added PHP and Composer to your system PATH
 - Make sure this project is parked or linked in Herd
 
-Start the frontend development server:
-
-```bash
-pnpm run dev
-```
 
 Then open the app in your browser using the Herd local domain:
 
