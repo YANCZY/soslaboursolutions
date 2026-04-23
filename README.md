@@ -7,6 +7,7 @@ This repository contains the SOS Labour Solutions web application built with Lar
 Before installing, make sure you have:
 
 - [Laravel Herd](https://herd.laravel.com/)
+- PHP `8.4+`
 - Node.js `18+`
 - pnpm
 - PostgreSQL
@@ -20,7 +21,7 @@ git clone <your-repo-url>
 cd soslaboursolutions
 ```
 
-2. Make sure Laravel Herd is installed and running.
+2. Make sure Laravel Herd is installed and running with PHP 8.4 or newer.
 
 Laravel Herd already covers the local PHP and Composer setup, so you do not need to install those separately in most cases.
 

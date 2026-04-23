@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Link } from '@inertiajs/vue3';
-import { BookOpen, FolderGit2, LayoutGrid } from 'lucide-vue-next';
+import { BookOpen, Building2, Calendar1Icon, Contact2, FolderGit2, LayoutGrid } from 'lucide-vue-next';
 import AppLogo from '@/components/AppLogo.vue';
 import NavFooter from '@/components/NavFooter.vue';
 import NavMain from '@/components/NavMain.vue';
@@ -25,6 +25,28 @@ const mainNavItems: NavItem[] = [
     },
 ];
 
+const peopleItems: NavItem[] = [
+    {
+        title: 'Clients',
+        href: '/clients',
+        icon: Building2
+    },
+    {
+        title: 'Contractors',
+        href: '/contractors',
+        icon: Contact2
+    },
+];
+
+const workspaceItems: NavItem[] = [
+    {
+        title: 'Attendance',
+        href: '/attendance',
+        icon: Calendar1Icon
+    },
+
+];
+
 const footerNavItems: NavItem[] = [
     {
         title: 'Repository',
@@ -40,7 +62,7 @@ const footerNavItems: NavItem[] = [
 </script>
 
 <template>
-    <Sidebar collapsible="icon" variant="inset">
+    <Sidebar collapsible="icon" variant="sidebar">
         <SidebarHeader>
             <SidebarMenu>
                 <SidebarMenuItem>
@@ -54,7 +76,7 @@ const footerNavItems: NavItem[] = [
         </SidebarHeader>
 
         <SidebarContent>
-            <NavMain :items="mainNavItems" />
+            <NavMain :items="mainNavItems" :people-items="peopleItems" :workspace-items="workspaceItems" />
         </SidebarContent>
 
         <SidebarFooter>
