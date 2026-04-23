@@ -17,7 +17,12 @@ Route::get('/', function () {
 
 
 Route::middleware(['auth', 'verified'])->group(function () {
+    // HOME
     Route::inertia('dashboard', 'Dashboard')->name('dashboard');
+    // Workspace
+    Route::inertia('clients', 'admin/clients/index')->name('clients.index');
+    Route::inertia('contractors', 'admin/contractors/index')->name('contractors.index');
+    Route::inertia('attendance', 'attendance/index')->name('attendance.index');
 });
 
 require __DIR__.'/settings.php';
