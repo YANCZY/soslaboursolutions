@@ -30,9 +30,13 @@ defineOptions({
     layout: {
         breadcrumbs: [
             {
-                title: 'Security settings',
-                href: edit(),
+                title: 'Settings',
+                href: '/settings',
             },
+            {
+                title: 'Security',
+                href: edit(),
+            }
         ],
     },
 });
@@ -44,9 +48,9 @@ onUnmounted(() => clearTwoFactorAuthData());
 </script>
 
 <template>
-    <Head title="Security settings" />
+    <Head title="Security" />
 
-    <h1 class="sr-only">Security settings</h1>
+    <h1 class="sr-only">Security</h1>
 
     <div class="space-y-6">
         <Heading
