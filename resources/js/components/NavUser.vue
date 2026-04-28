@@ -18,14 +18,14 @@ import UserMenuContent from '@/components/UserMenuContent.vue';
 
 const page = usePage();
 const user = computed(() => page.props.auth.user);
-const { isMobile } = useSidebar();
+const { isMobile, state } = useSidebar();
 </script>
 
 <template>
     <SidebarMenu>
         <SidebarMenuItem>
             <DropdownMenu>
-                <DropdownMenuTrigger :as-child="true">
+                <DropdownMenuTrigger as-child>
                     <SidebarMenuButton
                         size="lg"
                         class="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
@@ -37,7 +37,13 @@ const { isMobile } = useSidebar();
                 </DropdownMenuTrigger>
                 <DropdownMenuContent
                     class="w-(--reka-dropdown-menu-trigger-width) min-w-56 rounded-lg"
-                    :side="isMobile ? 'bottom' : 'right'"
+                   :side="
+                        isMobile
+                            ? 'bottom'
+                            : state === 'collapsed'
+                              ? 'left'
+                              : 'bottom'
+                    "
                     align="end"
                     :side-offset="4"
                 >

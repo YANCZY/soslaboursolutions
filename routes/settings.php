@@ -3,6 +3,8 @@
 use App\Http\Controllers\Settings\ProfileController;
 use App\Http\Controllers\Settings\SecurityController;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\Admin\Settings\UserSettingsController;
+
 
 Route::middleware(['auth'])->group(function () {
     Route::redirect('settings', '/settings/profile');
@@ -20,5 +22,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('user-password.update');
 
     Route::inertia('settings/appearance', 'settings/Appearance')->name('appearance.edit');
-    Route::inertia('settings/users', 'admin/settings/users/index')->name('settings.users.index');
+    Route::get('settings/users', [UserSettingsController::class, 'index'])
+    ->name('settings.users.index');
+    Route::patch('settings/users/{user}/toggle-status',[UserSettingsController::class, 'toggleStatus'])->name('settings.users.toggle-status');
+
+
 });

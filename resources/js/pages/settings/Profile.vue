@@ -28,7 +28,7 @@ defineOptions({
             {
                 title: 'Profile',
                 href: edit(),
-            }
+            },
         ],
     },
 });
@@ -97,6 +97,28 @@ const user = computed(() => page.props.auth.user);
                     placeholder="Email address"
                 />
                 <InputError class="mt-2" :message="errors.email" />
+            </div>
+
+            <div class="grid gap-2">
+                <Label for="phone">Phone</Label>
+                <Input
+                    id="phone"
+                    name="phone"
+                    :default-value="user.phone ?? undefined"
+                    placeholder="Phone"
+                />
+                <InputError class="mt-2" :message="errors.phone" />
+            </div>
+
+            <div class="grid gap-2">
+                <Label for="mobile">Mobile</Label>
+                <Input
+                    id="mobile"
+                    name="mobile"
+                    :default-value="user.mobile ?? undefined"
+                    placeholder="Mobile"
+                />
+                <InputError class="mt-2" :message="errors.mobile" />
             </div>
 
             <div v-if="mustVerifyEmail && !user.email_verified_at">

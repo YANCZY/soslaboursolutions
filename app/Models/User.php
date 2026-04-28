@@ -13,7 +13,7 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Fortify\TwoFactorAuthenticatable;
 
-#[Fillable(['first_name', 'last_name', 'user_type_id', 'email', 'password'])]
+#[Fillable(['first_name', 'last_name', 'user_type_id', 'client_id', 'email', 'password', 'status', 'phone', 'mobile'])]
 #[Hidden(['password', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token'])]
 class User extends Authenticatable
 {
@@ -50,6 +50,9 @@ class User extends Authenticatable
             get: fn () => trim(collect([
                 $this->first_name,
                 $this->last_name,
+                $this->status,
+                $this->phone,
+                $this->mobile,
             ])->filter()->implode(' ')),
         );
     }
@@ -61,4 +64,13 @@ class User extends Authenticatable
     {
         return $this->belongsTo(UserType::class);
     }
+
+    /**
+     * Get the client that owns the user.
+     */
+    public function client(): BelongsTo
+    {
+        return $this->belongsTo(Client::class);
+    }
+
 }

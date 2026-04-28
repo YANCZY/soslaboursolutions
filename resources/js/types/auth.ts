@@ -4,6 +4,9 @@ export type User = {
     last_name: string;
     user_type_id: number;
     email: string;
+    phone?: string | null;
+    mobile?: string | null;
+    status: 'active' | 'inactive';
     avatar?: string;
     email_verified_at: string | null;
     created_at: string;
