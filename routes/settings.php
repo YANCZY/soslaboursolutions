@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Admin\Settings\UserSettingsController;
 
 
+
 Route::middleware(['auth'])->group(function () {
     Route::redirect('settings', '/settings/profile');
     Route::get('settings/profile', [ProfileController::class, 'edit'])->name('profile.edit');
@@ -25,6 +26,4 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('settings/users', [UserSettingsController::class, 'index'])
     ->name('settings.users.index');
     Route::patch('settings/users/{user}/toggle-status',[UserSettingsController::class, 'toggleStatus'])->name('settings.users.toggle-status');
-
-
 });

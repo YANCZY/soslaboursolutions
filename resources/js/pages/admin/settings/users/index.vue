@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Head, Link, router } from '@inertiajs/vue3';
 import { User } from 'lucide-vue-next';
+import { toast } from 'vue-sonner';
 import Heading from '@/components/Heading.vue';
 import SettingsLayout from '@/layouts/settings/Layout.vue';
 import { index as usersIndex } from '@/routes/settings/users';
@@ -58,14 +59,21 @@ const statusBadgeClass = (status: User['status']) => {
 };
 
 const toggleStatus = (user: User) => {
+    const message =
+        user.status === 'active'
+            ? 'User has been deactivated.'
+            : 'User has been activated.';
+
     router.patch(
         `/settings/users/${user.id}/toggle-status`,
         {},
         {
             preserveScroll: true,
+            onSuccess: () => toast.success(message),
         },
     );
 };
+
 
 defineOptions({
     layout: {
