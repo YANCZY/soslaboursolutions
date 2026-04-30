@@ -7,6 +7,34 @@ import { initializeFlashToast } from '@/lib/flashToast';
 
 const appName = import.meta.env.VITE_APP_NAME || 'Laravel';
 
+const protectedPaths = ['/dashboard', '/clients', '/contractors', '/attendance', '/settings'];
+
+const isProtectedPage = () => {
+    return protectedPaths.some((path) => window.location.pathname.startsWith(path));
+};
+
+setInterval(async () => {
+    if (!isProtectedPage()) {
+        return;
+    }
+
+    const response = await fetch('/auth/status', {
+        credentials: 'same-origin',
+        cache: 'no-store',
+        headers: {
+            Accept: 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+        },
+    });
+
+
+    if (response.status === 403 || response.status === 401) {
+        window.location.href = '/login';
+    }
+}, 10000);
+
+
+
 createInertiaApp({
     title: (title) => (title ? `${title} - ${appName}` : appName),
     layout: (name) => {

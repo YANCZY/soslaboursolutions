@@ -8,7 +8,6 @@ use Illuminate\Http\RedirectResponse;
 use Inertia\Inertia;
 
 
-
 class UserSettingsController extends Controller
 {
     public function index()
@@ -28,8 +27,6 @@ class UserSettingsController extends Controller
         $user->update([
             'status' => $user->status === 'active' ? 'inactive' : 'active',
         ]);
-
-        Inertia::flash('toast', ['type' => 'success', 'message' => __('User status updated.')]);
 
         return back();
     }
