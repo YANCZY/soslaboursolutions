@@ -1,10 +1,23 @@
 <script setup lang="ts">
-import { Head, Link, router } from '@inertiajs/vue3';
-import { Search, User } from 'lucide-vue-next';
-import { ref, watch } from 'vue';
+import { Head, Link, router, useForm  } from '@inertiajs/vue3';
+import { Plus, Search, User } from 'lucide-vue-next';
+import { computed, ref, watch } from 'vue';
 import { toast } from 'vue-sonner';
 import Heading from '@/components/Heading.vue';
+import InputError from '@/components/InputError.vue';
+import { Button } from '@/components/ui/button';
+import {
+    Dialog,
+    DialogClose,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import SettingsLayout from '@/layouts/settings/Layout.vue';
 
 
@@ -39,14 +52,80 @@ type PaginatedUsers = {
     total: number;
 };
 
+type Company = {
+    id: number;
+    company_name: string;
+};
+
+
 const props = defineProps<{
     users: PaginatedUsers;
+    companies: Company[];
     filters: {
         search: string;
     };
 }>();
 
 const search = ref(props.filters.search ?? '');
+
+const companySearch = ref('');
+const companyLookupOpen = ref(false);
+const selectedCompanyId = ref<number | null>(null);
+
+const addUserDialogOpen = ref(false);
+
+const addUserForm = useForm({
+    first_name: '',
+    last_name: '',
+    email: '',
+    phone: '',
+    client_id: null as number | null,
+});
+
+
+const filteredCompanies = computed(() => {
+    const value = companySearch.value.trim().toLowerCase();
+
+    if (!value) {
+        return props.companies;
+    }
+
+    return props.companies.filter((company) =>
+        company.company_name.toLowerCase().includes(value),
+    );
+});
+
+const selectCompany = (company: Company) => {
+    selectedCompanyId.value = company.id;
+    companySearch.value = company.company_name;
+    companyLookupOpen.value = false;
+};
+
+const closeCompanyLookup = () => {
+    window.setTimeout(() => {
+        companyLookupOpen.value = false;
+    }, 100);
+};
+
+const saveUser = () => {
+    addUserForm.client_id = selectedCompanyId.value;
+
+    addUserForm.post('/settings/users/', {
+        preserveScroll: true,
+        onSuccess: () => {
+            addUserDialogOpen.value = false;
+            addUserForm.reset();
+            companySearch.value = '';
+            selectedCompanyId.value = null;
+            toast.success('User has been added.');
+        },
+
+    });
+};
+
+
+
+
 
 watch(search, (value) => {
     router.get(
@@ -123,6 +202,114 @@ defineOptions({
                 title="Users"
                 description="Manage users who can access this workspace"
             />
+<!-- SEARCH -->
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <Dialog v-model:open="addUserDialogOpen">
+    <DialogTrigger as-child>
+        <Button
+            type="button"
+            class="h-8 gap-2  text-white hover:bg-red-700"
+        >
+            <Plus class="size-4" />
+            Add user
+                </Button>
+            </DialogTrigger>
+
+            <DialogContent class="sm:max-w-lg">
+                <DialogHeader>
+                    <DialogTitle>Add user</DialogTitle>
+                    <DialogDescription>
+                        Create a user profile for workspace access.
+                    </DialogDescription>
+                </DialogHeader>
+
+                <div class="grid gap-4 py-2 sm:grid-cols-2">
+                    <div class="grid gap-2">
+                        <Label for="first_name">First name</Label>
+                        <Input id="first_name"  v-model="addUserForm.first_name"  placeholder="First name" />
+                        <InputError :message="addUserForm.errors.first_name" />
+                    </div>
+
+                    <div class="grid gap-2">
+                        <Label for="last_name">Last name</Label>
+                        <Input id="last_name"  v-model="addUserForm.last_name" placeholder="Last name" />
+                        <InputError :message="addUserForm.errors.last_name" />
+                    </div>
+
+                    <div class="grid gap-2">
+                        <Label for="email">Email</Label>
+                        <Input id="email" type="email"  v-model="addUserForm.email" placeholder="email@example.com" />
+                        <InputError :message="addUserForm.errors.email" />
+                    </div>
+
+                    <div class="grid gap-2">
+                        <Label for="phone">Phone</Label>
+                        <Input id="phone"  v-model="addUserForm.phone" placeholder="Phone number" />
+                        <InputError :message="addUserForm.errors.phone" />
+                    </div>
+
+                   <div class="grid gap-2 sm:col-span-2">
+                        <Label for="company">Company</Label>
+
+                        <div class="relative">
+                            <Input
+                                id="company"
+                                v-model="companySearch"
+                                type="search"
+                                placeholder="Search company..."
+                                autocomplete="off"
+                                @focus="companyLookupOpen = true"
+                                 @blur="closeCompanyLookup"
+                                @keydown.escape="companyLookupOpen = false"
+                            />
+                            <InputError :message="addUserForm.errors.client_id" />
+
+                            <div
+                                v-if="companyLookupOpen"
+                                class="absolute z-50 mt-1 max-h-56 w-full overflow-y-auto rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
+                            >
+                                <button
+                                    v-for="company in filteredCompanies"
+                                    :key="company.id"
+                                    type="button"
+                                    class="flex w-full items-center rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent hover:text-accent-foreground"
+                                    @mousedown.prevent="selectCompany(company)"
+                                >
+                                    {{ company.company_name }}
+                                </button>
+
+                                <div
+                                    v-if="filteredCompanies.length === 0"
+                                    class="px-2 py-2 text-sm text-muted-foreground"
+                                >
+                                    No companies found.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+
+                </div>
+
+                <DialogFooter>
+                    <DialogClose as-child>
+                        <Button type="button" variant="secondary">
+                            Cancel
+                        </Button>
+                    </DialogClose>
+
+                    <Button
+                        type="button"
+                        class="bg-red-600 text-white"
+                        :disabled="addUserForm.processing"
+                        @click="saveUser"
+                    >
+                        Save user
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+
 
             <div
                 class="relative w-40 transition-[width] duration-200 ease-in-out hover:w-64 focus-within:w-64"
@@ -137,6 +324,9 @@ defineOptions({
                     class="h-8 pl-8 text-sm"
                 />
             </div>
+        </div>
+
+
 
             <div class="w-full max-w-7xl overflow-hidden rounded-md border">
 

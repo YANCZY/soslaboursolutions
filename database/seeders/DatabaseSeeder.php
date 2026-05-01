@@ -18,9 +18,9 @@ class DatabaseSeeder extends Seeder
     {
         // User::factory(10)->create();
 
-        $adminUserType = UserType::query()->firstOrCreate([
-            'user_type_name' => 'Admin',
-        ]);
+        // $adminUserType = UserType::query()->firstOrCreate([
+        //     'user_type_name' => 'Admin',
+        // ]);
 
     //    User::factory()
     //     ->count(10)
@@ -34,24 +34,13 @@ class DatabaseSeeder extends Seeder
     //         'password' => bcrypt('password123'),
     //     ]);
 
-       $clients = collect([
-            'Northstar Manufacturing Inc.',
-            'BrightPath Logistics Corp.',
-            'Harborline Foods Ltd.',
-            'SummitCare Services',
-            'MetroBuild Contractors',
-        ])->map(fn (string $companyName) => Client::firstOrCreate([
-            'company_name' => $companyName,
-        ]));
 
-        User::query()
-            ->whereNull('client_id')
-            ->get()
-            ->each(function (User $user) use ($clients): void {
-                $user->update([
-                    'client_id' => $clients->random()->id,
-                ]);
-            });
+        collect(range(1, 10))->each(function ($index) {
+            Client::create([
+                'company_name' => 'Company ' . $index,
+            ]);
+        });
+
 
 
     }
