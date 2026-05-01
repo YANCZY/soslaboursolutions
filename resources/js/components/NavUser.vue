@@ -9,7 +9,6 @@ import {
 } from '@/components/ui/dropdown-menu';
 import {
     SidebarMenu,
-    SidebarMenuButton,
     SidebarMenuItem,
     useSidebar,
 } from '@/components/ui/sidebar';
@@ -25,24 +24,25 @@ const { isMobile, state } = useSidebar();
     <SidebarMenu>
         <SidebarMenuItem>
             <DropdownMenu>
-                <DropdownMenuTrigger as-child>
-                    <SidebarMenuButton
-                        size="lg"
-                        class="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
-                        data-test="sidebar-menu-button"
-                    >
-                        <UserInfo :user="user" />
-                        <ChevronsUpDown class="ml-auto size-4" />
-                    </SidebarMenuButton>
+                <DropdownMenuTrigger
+                    type="button"
+                    data-sidebar="menu-button"
+                    data-slot="sidebar-menu-button"
+                    data-size="lg"
+                    data-test="sidebar-menu-button"
+                    class="peer/menu-button flex h-12 w-full items-center gap-2 overflow-hidden rounded-md p-2 text-left text-sm ring-sidebar-ring outline-hidden transition-[width,height,padding] hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 active:bg-sidebar-accent active:text-sidebar-accent-foreground data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground group-data-[collapsible=icon]:size-8! group-data-[collapsible=icon]:p-0! [&>span:last-child]:truncate [&>svg]:size-4 [&>svg]:shrink-0"
+                >
+                    <UserInfo :user="user" />
+                    <ChevronsUpDown class="ml-auto size-4" />
                 </DropdownMenuTrigger>
                 <DropdownMenuContent
                     class="w-(--reka-dropdown-menu-trigger-width) min-w-56 rounded-lg"
-                   :side="
+                    :side="
                         isMobile
                             ? 'bottom'
                             : state === 'collapsed'
-                              ? 'left'
-                              : 'bottom'
+                              ? 'right'
+                              : 'top'
                     "
                     align="end"
                     :side-offset="4"

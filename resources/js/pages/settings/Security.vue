@@ -11,7 +11,6 @@ import TwoFactorSetupModal from '@/components/TwoFactorSetupModal.vue';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { useTwoFactorAuth } from '@/composables/useTwoFactorAuth';
-import { edit } from '@/routes/security';
 import { disable, enable } from '@/routes/two-factor';
 
 type Props = {
@@ -35,7 +34,7 @@ defineOptions({
             },
             {
                 title: 'Security',
-                href: edit(),
+                href: '/settings/security',
             }
         ],
     },

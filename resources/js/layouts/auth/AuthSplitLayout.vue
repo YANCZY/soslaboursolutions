@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { Link } from '@inertiajs/vue3';
 import AppLogoIcon from '@/components/AppLogoIcon.vue';
-import { home } from '@/routes';
 
 defineProps<{
     title?: string;
@@ -37,7 +36,7 @@ defineProps<{
                         class="flex items-center justify-between border-b border-white/10 pb-6"
                     >
                         <Link
-                            :href="home()"
+                            href="/"
                             class="flex items-center gap-4 text-white"
                         >
                             <div
@@ -147,7 +146,7 @@ defineProps<{
                 >
                     <div class="mb-8 flex items-center justify-between lg:hidden">
                         <Link
-                            :href="home()"
+                            href="/"
                             class="flex items-center gap-3 text-foreground"
                         >
                             <div
