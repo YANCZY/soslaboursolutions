@@ -8,9 +8,6 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
-import { register } from '@/routes';
-import { store } from '@/routes/login';
-import { request } from '@/routes/password';
 
 defineOptions({
     layout: {
@@ -37,7 +34,8 @@ defineProps<{
     </div>
 
     <Form
-        v-bind="store.form()"
+        action="/login"
+        method="post"
         :reset-on-success="['password']"
         v-slot="{ errors, processing }"
         class="flex flex-col gap-6"
@@ -63,7 +61,7 @@ defineProps<{
                     <Label for="password">Password</Label>
                     <TextLink
                         v-if="canResetPassword"
-                        :href="request()"
+                        href="/forgot-password"
                         class="text-sm"
                         :tabindex="5"
                     >
@@ -105,7 +103,7 @@ defineProps<{
             v-if="canRegister"
         >
             Don't have an account?
-            <TextLink :href="register()" :tabindex="5">Sign up</TextLink>
+            <TextLink href="/register" :tabindex="5">Sign up</TextLink>
         </div>
     </Form>
 </template>

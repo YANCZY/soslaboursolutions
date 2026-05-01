@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { Head, Link, router } from '@inertiajs/vue3';
-import { User } from 'lucide-vue-next';
+import { Search, User } from 'lucide-vue-next';
+import { ref, watch } from 'vue';
 import { toast } from 'vue-sonner';
 import Heading from '@/components/Heading.vue';
+import { Input } from '@/components/ui/input';
 import SettingsLayout from '@/layouts/settings/Layout.vue';
-import { index as usersIndex } from '@/routes/settings/users';
 
 
 
@@ -38,9 +39,28 @@ type PaginatedUsers = {
     total: number;
 };
 
-defineProps<{
+const props = defineProps<{
     users: PaginatedUsers;
+    filters: {
+        search: string;
+    };
 }>();
+
+const search = ref(props.filters.search ?? '');
+
+watch(search, (value) => {
+    router.get(
+        '/settings/users',
+        {
+            search: value || undefined,
+        },
+        {
+            preserveState: true,
+            preserveScroll: true,
+            replace: true,
+        },
+    );
+});
 
 const paginationLabel = (label: string) => {
     return label
@@ -84,7 +104,7 @@ defineOptions({
             },
             {
                 title: 'Users',
-                href: usersIndex(),
+                href: '/settings/users',
             },
         ],
     },
@@ -97,14 +117,29 @@ defineOptions({
     <SettingsLayout>
         <h1 class="sr-only">Users</h1>
 
-        <div class="flex flex-col space-y-6">
+        <div class="flex flex-col gap-4">
             <Heading
                 variant="small"
                 title="Users"
                 description="Manage users who can access this workspace"
             />
-        </div>
-        <div class="w-full max-w-7xl overflow-hidden rounded-md border">
+
+            <div
+                class="relative w-40 transition-[width] duration-200 ease-in-out hover:w-64 focus-within:w-64"
+            >
+                <Search
+                    class="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground"
+                />
+                <Input
+                    v-model="search"
+                    type="search"
+                    placeholder="Search users..."
+                    class="h-8 pl-8 text-sm"
+                />
+            </div>
+
+            <div class="w-full max-w-7xl overflow-hidden rounded-md border">
+
             <div class="hidden overflow-x-auto md:block">
                 <table class="w-full min-w-[68rem] table-fixed text-sm">
                     <thead class="bg-muted text-left">
@@ -304,6 +339,7 @@ defineOptions({
                 </div>
             </div>
             <!-- End Pagination -->
+            </div>
         </div>
     </SettingsLayout>
 </template>
