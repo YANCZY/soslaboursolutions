@@ -7,6 +7,10 @@ use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Inertia\Inertia;
 use Illuminate\Http\Request;
+use App\Models\Client;
+use App\Models\UserType;
+use Illuminate\Support\Str;
+
 
 
 class UserSettingsController extends Controller
@@ -42,6 +46,11 @@ class UserSettingsController extends Controller
             'filters' => [
                 'search' => $search,
             ],
+            'companies' => Client::query()
+            ->select('id', 'company_name')
+            ->orderBy('company_name', 'asc')
+            ->get(),
+
         ]);
     }
 
@@ -49,6 +58,33 @@ class UserSettingsController extends Controller
     {
         $user->update([
             'status' => $user->status === 'active' ? 'inactive' : 'active',
+        ]);
+
+        return back();
+    }
+
+    public function store(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'first_name' => 'required|string|max:255',
+            'last_name' => 'required|string|max:255',
+            'email' => 'required|email|unique:users,email',
+            'phone' => 'nullable|string|max:20',
+            'mobile' => 'nullable|string|max:20',
+            'client_id' => 'nullable|exists:clients,id',
+        ]);
+
+           $adminUserType = UserType::query()->firstOrCreate([
+                'user_type_name' => 'Admin',
+            ]);
+
+        // User::create($validated + ['status' => 'active']);
+         User::create([
+           ...$validated,
+            'mobile' => $validated['mobile'] ?? null,
+            'status' => 'active',
+            'password'=> bcrypt('password123'),
+            'user_type_id' => $adminUserType->id,
         ]);
 
         return back();
