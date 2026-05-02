@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { Form, Head } from '@inertiajs/vue3';
+import { Form, Head, router } from '@inertiajs/vue3';
+import { onBeforeUnmount, onMounted } from 'vue';
 import InputError from '@/components/InputError.vue';
 import PasswordInput from '@/components/PasswordInput.vue';
 import TextLink from '@/components/TextLink.vue';
@@ -21,6 +22,39 @@ defineProps<{
     canResetPassword: boolean;
     canRegister: boolean;
 }>();
+
+const redirectIfAuthenticated = async () => {
+    try {
+        const response = await fetch('/auth/status', {
+            headers: {
+                Accept: 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+            },
+        });
+
+        if (response.ok) {
+            router.visit('/dashboard', { replace: true });
+        }
+    } catch {
+        //
+    }
+};
+
+const handlePageShow = () => {
+    void redirectIfAuthenticated();
+};
+
+onMounted(() => {
+    void redirectIfAuthenticated();
+
+    window.addEventListener('pageshow', handlePageShow);
+});
+
+onBeforeUnmount(() => {
+    window.removeEventListener('pageshow', handlePageShow);
+});
+
+
 </script>
 
 <template>
