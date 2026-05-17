@@ -6,7 +6,7 @@ export type User = {
     email: string;
     phone?: string | null;
     mobile?: string | null;
-    status: 'active' | 'inactive';
+    status: 'active' | 'inactive' | 'pending';
     avatar?: string;
     email_verified_at: string | null;
     created_at: string;

@@ -27,7 +27,7 @@ type User = {
     first_name: string;
     last_name: string;
     email: string;
-    status: 'active' | 'inactive';
+    status: 'active' | 'inactive' | 'pending';
     phone: string | null;
     mobile: string | null;
     client: {
@@ -152,9 +152,15 @@ const statusLabel = (status: User['status']) => {
 };
 
 const statusBadgeClass = (status: User['status']) => {
-    return status === 'active'
-        ? 'border-green-200 bg-green-50 text-green-700 dark:border-green-900/60 dark:bg-green-950/40 dark:text-green-300'
-        : 'border-red-200 bg-red-50 text-red-700 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300';
+    if (status === 'active') {
+        return 'border-green-200 bg-green-50 text-green-700 dark:border-green-900/60 dark:bg-green-950/40 dark:text-green-300';
+    }
+
+    if (status === 'pending') {
+        return 'border-orange-200 bg-orange-50 text-orange-700 dark:border-orange-900/60 dark:bg-orange-950/40 dark:text-orange-300';
+    }
+
+    return 'border-red-200 bg-red-50 text-red-700 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300';
 };
 
 const toggleStatus = (user: User) => {

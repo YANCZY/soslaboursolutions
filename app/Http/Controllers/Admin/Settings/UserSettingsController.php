@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Admin\Settings;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use Illuminate\Support\Facades\Password;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Http\RedirectResponse;
 use Inertia\Inertia;
 use Illuminate\Http\Request;
@@ -79,13 +81,23 @@ class UserSettingsController extends Controller
             ]);
 
         // User::create($validated + ['status' => 'active']);
-         User::create([
+        User::create([
            ...$validated,
             'mobile' => $validated['mobile'] ?? null,
-            'status' => 'active',
-            'password'=> bcrypt('password123'),
+            'status' => 'pending',
+            'password'=> Hash::make(Str::random(32)),
             'user_type_id' => $adminUserType->id,
         ]);
+
+        // $user->sendEmailVerificationNotification();
+        $status = Password::sendResetLink(['email' => $validated['email']]);
+
+
+        if ($status !== Password::RESET_LINK_SENT) {
+            return back()->withErrors([
+                'email' => __($status),
+            ]);
+        }
 
         return back();
     }
