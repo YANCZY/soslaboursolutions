@@ -117,7 +117,7 @@ const saveUser = () => {
             addUserForm.reset();
             companySearch.value = '';
             selectedCompanyId.value = null;
-            toast.success('User has been added.');
+            toast.success('User has been added. Account setup email will be sent shortly.');
         },
 
     });
@@ -125,21 +125,26 @@ const saveUser = () => {
 
 
 
+watch(search, (value, _oldValue, onCleanup) => {
 
+    const searchDelay = window.setTimeout(() => {
+        router.get(
+            '/settings/users',
+            {
+                search: value || undefined,
+            },
+            {
+                preserveState: true,
+                preserveScroll: true,
+                replace: true,
+            },
+        );
+    },500);
 
-watch(search, (value) => {
-    router.get(
-        '/settings/users',
-        {
-            search: value || undefined,
-        },
-        {
-            preserveState: true,
-            preserveScroll: true,
-            replace: true,
-        },
-    );
+    onCleanup(() => window.clearTimeout(searchDelay));
+
 });
+
 
 const paginationLabel = (label: string) => {
     return label
