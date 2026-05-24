@@ -33,6 +33,7 @@ const inputEmail = ref(props.email);
         :reset-on-success="['password', 'password_confirmation']"
         v-slot="{ errors, processing }"
     >
+
         <div class="grid gap-6">
             <div class="grid gap-2">
                 <Label for="email">Email</Label>

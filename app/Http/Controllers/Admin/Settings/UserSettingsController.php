@@ -3,7 +3,9 @@
 namespace App\Http\Controllers\Admin\Settings;
 
 use App\Http\Controllers\Controller;
+use App\Jobs\EmailSending\SendAccountAccessLink;
 use App\Models\User;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Http\RedirectResponse;
 use Inertia\Inertia;
 use Illuminate\Http\Request;
@@ -79,13 +81,16 @@ class UserSettingsController extends Controller
             ]);
 
         // User::create($validated + ['status' => 'active']);
-         User::create([
-           ...$validated,
-            'mobile' => $validated['mobile'] ?? null,
-            'status' => 'active',
-            'password'=> bcrypt('password123'),
-            'user_type_id' => $adminUserType->id,
-        ]);
+       $user = User::create([
+                ...$validated,
+                'mobile' => $validated['mobile'] ?? null,
+                'status' => 'pending',
+                'password'=> Hash::make(Str::random(32)),
+                'user_type_id' => $adminUserType->id,
+            ]);
+
+        SendAccountAccessLink::dispatch($user->id);
+
 
         return back();
     }
