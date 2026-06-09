@@ -8,15 +8,44 @@ import { Card, CardContent } from '@/components/ui/card';
 
 const page = usePage();
 
+type Attendance = {
+    id: number;
+    check_in_date: string;
+    status: 'checked_in' | 'lunch_break' | 'checked_out';
+    check_in_time: string | null;
+    check_out_time: string | null;
+    lunch_start_time: string | null;
+    lunch_end_time: string | null;
+    total_working_seconds: number;
+};
+
+const props = defineProps<{
+    attendance: Attendance | null;
+}>();
+
+const emit = defineEmits<{
+    'attendance-updated': [];
+}>();
+
+const activeAttendance = ref<Attendance | null>(props.attendance);
+
 const currentDateTime = ref(new Date());
-const checkInAt = ref<Date | null>(null);
+const checkInAt = computed(() => {
+    if (!activeAttendance.value?.check_in_date || !activeAttendance.value.check_in_time) {
+        return null;
+    }
+
+    const checkInDateTime = new Date(
+        `${activeAttendance.value.check_in_date} ${activeAttendance.value.check_in_time}`,
+    );
+
+    return Number.isNaN(checkInDateTime.getTime()) ? null : checkInDateTime;
+});
+
 let currentTimeTimer: number | undefined;
 
 const authUser = computed(() => page.props.auth.user);
 
-const checkInStorageKey = computed(
-    () => `attendance:${authUser.value.id}:check-in-at`,
-);
 
 const authUserFullName = computed(() =>
     [authUser.value.first_name, authUser.value.last_name]
@@ -72,10 +101,30 @@ const formattedPunchInTime = computed(() => {
     })}`;
 });
 
-const checkedIn = ref(false);
-const onLunchBreak = ref(false);
+const checkedIn = computed(() =>
+    activeAttendance.value?.status === 'checked_in' ||
+    activeAttendance.value?.status === 'lunch_break',
+);
+
+const onLunchBreak = computed(() =>
+    activeAttendance.value?.status === 'lunch_break',
+);
+
+const formatSeconds = (totalSeconds: number) => {
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+
+    return `${hours.toString().padStart(2, '0')}:${minutes
+        .toString()
+        .padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+};
 
 const formattedWorkClock = computed(() => {
+    if (activeAttendance.value?.status === 'checked_out') {
+        return formatSeconds(activeAttendance.value.total_working_seconds ?? 0);
+    }
+
     if (!checkInAt.value || Number.isNaN(checkInAt.value.getTime())) {
         return '00:00:00';
     }
@@ -88,52 +137,58 @@ const formattedWorkClock = computed(() => {
         ),
     );
 
-    const hours = Math.floor(elapsedSeconds / 3600);
-    const minutes = Math.floor((elapsedSeconds % 3600) / 60);
-    const seconds = elapsedSeconds % 60;
-
-    return `${hours.toString().padStart(2, '0')}:${minutes
-        .toString()
-        .padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+    return formatSeconds(elapsedSeconds);
 });
 
-const toggleCheckIn = () => {
-    checkedIn.value = !checkedIn.value;
+const postAttendanceAction = async (url: string) => {
+    const response = await fetch(url, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {
+            Accept: 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-Timezone': Intl.DateTimeFormat().resolvedOptions().timeZone,
+            'X-CSRF-TOKEN':
+                document
+                    .querySelector('meta[name="csrf-token"]')
+                    ?.getAttribute('content') ?? '',
+        },
+    });
 
+    if (!response.ok) {
+
+    console.error(await response.text());
+
+    return;
+}
+
+    const data = await response.json();
+
+    activeAttendance.value = data.attendance;
+    emit('attendance-updated');
+};
+
+const toggleCheckIn = async () => {
     if (checkedIn.value) {
-        checkInAt.value = new Date();
-        window.localStorage.setItem(
-            checkInStorageKey.value,
-            checkInAt.value.toISOString(),
-        );
+        await postAttendanceAction('/attendance/check-out');
 
         return;
     }
 
-    onLunchBreak.value = false;
-    checkInAt.value = null;
-    window.localStorage.removeItem(checkInStorageKey.value);
+    await postAttendanceAction('/attendance/check-in');
 };
 
-const toggleLunchBreak = () => {
-    onLunchBreak.value = !onLunchBreak.value;
+const toggleLunchBreak = async () => {
+    if (onLunchBreak.value) {
+        await postAttendanceAction('/attendance/lunch/end');
+
+        return;
+    }
+
+    await postAttendanceAction('/attendance/lunch/start');
 };
 
 onMounted(() => {
-    const storedCheckInAt = window.localStorage.getItem(
-        checkInStorageKey.value,
-    );
-
-    if (storedCheckInAt) {
-        const parsedCheckInAt = new Date(storedCheckInAt);
-
-        if (Number.isNaN(parsedCheckInAt.getTime())) {
-            window.localStorage.removeItem(checkInStorageKey.value);
-        } else {
-            checkInAt.value = parsedCheckInAt;
-            checkedIn.value = true;
-        }
-    }
 
     currentTimeTimer = window.setInterval(() => {
         currentDateTime.value = new Date();
@@ -181,12 +236,18 @@ onBeforeUnmount(() => {
                     >
                         <Clock class="size-4 shrink-0 text-primary" />
                         <span>{{ formattedPunchInTime }}</span>
+                        <p v-if="onLunchBreak" class="text-sm font-medium text-amber-600">
+                         Lunch Break
+                        </p>
                     </div>
+
+
 
                     <div class="flex w-full items-center gap-2">
                         <Button
                             type="button"
                             class="h-11 flex-1"
+                            :class="checkedIn ? 'bg-red-600 text-white hover:bg-red-700' : ''"
                             @click="toggleCheckIn"
                         >
                             <AlarmClockOff

@@ -14,6 +14,7 @@ use Illuminate\Notifications\Notifiable;
 use Laravel\Fortify\TwoFactorAuthenticatable;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use App\Notifications\AccountAccessNotification;
+use App\Models\Attendance;
 
 
 #[Fillable(['first_name', 'last_name', 'user_type_id', 'client_id', 'email', 'password', 'status', 'phone', 'mobile'])]
@@ -75,9 +76,15 @@ class User extends Authenticatable implements MustVerifyEmail
     {
         return $this->belongsTo(Client::class);
     }
+
     public function sendPasswordResetNotification($token): void
     {
         $this->notify(new AccountAccessNotification($token));
+    }
+
+    public function attendance()
+    {
+        return $this->hasMany(Attendance::class, 'employee_id');
     }
 
 }
