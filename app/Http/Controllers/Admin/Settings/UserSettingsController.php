@@ -34,7 +34,12 @@ class UserSettingsController extends Controller
                         ->whereRaw('LOWER(first_name) LIKE ?', [$searchValue])
                         ->orWhereRaw('LOWER(last_name) LIKE ?', [$searchValue])
                         ->orWhereRaw("LOWER(first_name || ' ' || last_name) LIKE ?", [$searchValue])
-                        ->orWhereRaw('LOWER(email) LIKE ?', [$searchValue]);
+                        ->orWhereRaw('LOWER(email) LIKE ?', [$searchValue])
+                        ->orWhereHas(
+                            'client',
+                            function ($query) use ($normalizedSearch, $searchValue) {
+                                $query->whereRaw('LOWER(company_name) LIKE ?', [$searchValue]);
+                            });
 
                     if (in_array($normalizedSearch, ['active', 'inactive'], true)) {
                         $query->orWhere('status', $normalizedSearch);
