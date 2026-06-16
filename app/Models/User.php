@@ -12,10 +12,14 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Fortify\TwoFactorAuthenticatable;
+use Illuminate\Contracts\Auth\MustVerifyEmail;
+use App\Notifications\AccountAccessNotification;
+use App\Models\Attendance;
+
 
 #[Fillable(['first_name', 'last_name', 'user_type_id', 'client_id', 'email', 'password', 'status', 'phone', 'mobile'])]
 #[Hidden(['password', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token'])]
-class User extends Authenticatable
+class User extends Authenticatable implements MustVerifyEmail
 {
     /** @use HasFactory<UserFactory> */
     use HasFactory, Notifiable, TwoFactorAuthenticatable;
@@ -71,6 +75,16 @@ class User extends Authenticatable
     public function client(): BelongsTo
     {
         return $this->belongsTo(Client::class);
+    }
+
+    public function sendPasswordResetNotification($token): void
+    {
+        $this->notify(new AccountAccessNotification($token));
+    }
+
+    public function attendance()
+    {
+        return $this->hasMany(Attendance::class, 'employee_id');
     }
 
 }

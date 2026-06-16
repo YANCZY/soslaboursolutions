@@ -8,7 +8,20 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 
 
-#[Fillable(['company_name'])]
+#[Fillable([
+    'company_name',
+    'company_type',
+    'trade',
+    'industry',
+    'industry_description',
+    'phone',
+    'website',
+    'company_address',
+    'company_address_2',
+    'company_address_city',
+    'company_address_state',
+    'company_address_country',
+])]
 class Client extends Model
 {
     use HasFactory;

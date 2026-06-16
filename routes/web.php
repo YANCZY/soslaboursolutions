@@ -3,8 +3,8 @@
 use Illuminate\Support\Facades\Route;
 use Laravel\Fortify\Features;
 use Illuminate\Support\Facades\Auth;
-
-
+use App\Http\Controllers\AttendanceController;
+use App\Http\Controllers\Admin\ClientController;
 
 // Route::inertia('/', 'auth/Login', [
 //     'canRegister' => Features::enabled(Features::registration()),
@@ -16,13 +16,6 @@ Route::get('/', function () {
         : redirect()->route('login');
 })->name('home');
 
-// Route::get('/login',function(){
-//     return Auth::check()
-//         ? redirect()->route('dashboard')
-//         : redirect()->route('login');
-// })->name('login');
-
-
 Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::get('auth/status', function () {
@@ -30,10 +23,19 @@ Route::middleware(['auth', 'verified'])->group(function () {
     })->name('auth.status');
     // HOME
     Route::inertia('dashboard', 'Dashboard')->name('dashboard');
-    // Workspace
-    Route::inertia('clients', 'admin/clients/index')->name('clients.index');
+    // Workspace Contractor
     Route::inertia('contractors', 'admin/contractors/index')->name('contractors.index');
-    Route::inertia('attendance', 'attendance/index')->name('attendance.index');
+    // Workspace Clients
+    Route::get('clients', [ClientController::class, 'index'])->name('clients.index');
+    Route::post('clients', [ClientController::class, 'store'])->name('clients.store');
+    Route::get('clients/save-requests/{clientSaveRequest}', [ClientController::class, 'saveStatus'])->name('clients.save-status');
+
+    // Attendance
+    Route::get('attendance', [AttendanceController::class, 'index'])->name('attendance.index');
+    Route::post('attendance/check-in', [AttendanceController::class, 'checkIn'])->name('attendance.check-in');
+    Route::post('attendance/lunch/start', [AttendanceController::class, 'startLunch'])->name('attendance.lunch.start');
+    Route::post('attendance/lunch/end', [AttendanceController::class, 'endLunch'])->name('attendance.lunch.end');
+    Route::post('attendance/check-out', [AttendanceController::class, 'checkOut'])->name('attendance.check-out');
 });
 
 

@@ -3,7 +3,9 @@
 namespace App\Http\Controllers\Admin\Settings;
 
 use App\Http\Controllers\Controller;
+use App\Jobs\EmailSending\SendAccountAccessLink;
 use App\Models\User;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Http\RedirectResponse;
 use Inertia\Inertia;
 use Illuminate\Http\Request;
@@ -32,7 +34,12 @@ class UserSettingsController extends Controller
                         ->whereRaw('LOWER(first_name) LIKE ?', [$searchValue])
                         ->orWhereRaw('LOWER(last_name) LIKE ?', [$searchValue])
                         ->orWhereRaw("LOWER(first_name || ' ' || last_name) LIKE ?", [$searchValue])
-                        ->orWhereRaw('LOWER(email) LIKE ?', [$searchValue]);
+                        ->orWhereRaw('LOWER(email) LIKE ?', [$searchValue])
+                        ->orWhereHas(
+                            'client',
+                            function ($query) use ($normalizedSearch, $searchValue) {
+                                $query->whereRaw('LOWER(company_name) LIKE ?', [$searchValue]);
+                            });
 
                     if (in_array($normalizedSearch, ['active', 'inactive'], true)) {
                         $query->orWhere('status', $normalizedSearch);
@@ -79,13 +86,16 @@ class UserSettingsController extends Controller
             ]);
 
         // User::create($validated + ['status' => 'active']);
-         User::create([
-           ...$validated,
-            'mobile' => $validated['mobile'] ?? null,
-            'status' => 'active',
-            'password'=> bcrypt('password123'),
-            'user_type_id' => $adminUserType->id,
-        ]);
+       $user = User::create([
+                ...$validated,
+                'mobile' => $validated['mobile'] ?? null,
+                'status' => 'pending',
+                'password'=> Hash::make(Str::random(32)),
+                'user_type_id' => $adminUserType->id,
+            ]);
+
+        SendAccountAccessLink::dispatch($user->id);
+
 
         return back();
     }
