@@ -13,9 +13,15 @@ import { send } from '@/routes/verification';
 type Props = {
     mustVerifyEmail: boolean;
     status?: string;
+    profile: {
+        job_role?: string | null;
+        travel_allowance?: string | number | null;
+        travel_allowance_currency?: string | null;
+        salary?: string | number | null;
+    };
 };
 
-defineProps<Props>();
+const props = defineProps<Props>();
 
 defineOptions({
     layout: {
@@ -45,7 +51,7 @@ const user = computed(() => page.props.auth.user);
         <Heading
             variant="small"
             title="Profile information"
-            description="Update your first name, last name, and email address"
+            description="Update your profile details"
         />
 
         <Form
@@ -81,9 +87,8 @@ const user = computed(() => page.props.auth.user);
                     />
                     <InputError class="mt-2" :message="errors.last_name" />
                 </div>
-            </div>
 
-            <div class="grid gap-2">
+                <div class="grid gap-2">
                 <Label for="email">Email address</Label>
                 <Input
                     id="email"
@@ -120,7 +125,73 @@ const user = computed(() => page.props.auth.user);
                 <InputError class="mt-2" :message="errors.mobile" />
             </div>
 
-            <div v-if="mustVerifyEmail && !user.email_verified_at">
+
+            <div class="grid gap-2">
+                    <Label for="job_role">Job role</Label>
+                    <Input
+                        id="job_role"
+                        name="job_role"
+                        :default-value="props.profile.job_role ?? undefined"
+                        placeholder="Job role"
+                    />
+                    <InputError class="mt-2" :message="errors.job_role" />
+                </div>
+
+                <div class="grid gap-2">
+                    <Label for="travel_allowance">Travel allowance</Label>
+                    <div class="relative">
+                        <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-sm text-muted-foreground">
+                            AU$
+                        </span>
+                        <Input
+                            id="travel_allowance"
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            name="travel_allowance"
+                            class="pl-12"
+                            :default-value="props.profile.travel_allowance ?? undefined"
+                            placeholder="0.00"
+                        />
+                    </div>
+                    <InputError class="mt-2" :message="errors.travel_allowance" />
+                </div>
+
+                <div class="grid gap-2" hidden>
+                    <Label for="travel_allowance_currency">Travel allowance currency</Label>
+                    <Input
+                        id="travel_allowance_currency"
+                        name="travel_allowance_currency"
+                        maxlength="3"
+                        disabled
+                        :default-value="props.profile.travel_allowance_currency ?? undefined"
+                        placeholder="AUD"
+                    />
+                    <InputError class="mt-2" :message="errors.travel_allowance_currency" />
+                </div>
+
+                <div class="grid gap-2">
+                    <Label for="salary">Salary</Label>
+                    <div class="relative">
+                        <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-sm text-muted-foreground">
+                            AU$
+                        </span>
+                        <Input
+                            id="salary"
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            name="salary"
+                            class="pl-12"
+                            :default-value="props.profile.salary ?? undefined"
+                            placeholder="0.00"
+                        />
+                    </div>
+                    <InputError class="mt-2" :message="errors.salary" />
+                </div>
+            </div>
+
+             <div v-if="mustVerifyEmail && !user.email_verified_at">
                 <p class="-mt-4 text-sm text-muted-foreground">
                     Your email address is unverified.
                     <Link
@@ -139,6 +210,8 @@ const user = computed(() => page.props.auth.user);
                     A new verification link has been sent to your email address.
                 </div>
             </div>
+
+
 
             <div class="flex items-center gap-4">
                 <Button :disabled="processing" data-test="update-profile-button"
