@@ -15,6 +15,9 @@ use Laravel\Fortify\TwoFactorAuthenticatable;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use App\Notifications\AccountAccessNotification;
 use App\Models\Attendance;
+use Illuminate\Database\Eloquent\Relations\HasOne;
+
+
 
 
 #[Fillable(['first_name', 'last_name', 'user_type_id', 'client_id', 'email', 'password', 'status', 'phone', 'mobile'])]
@@ -23,6 +26,16 @@ class User extends Authenticatable implements MustVerifyEmail
 {
     /** @use HasFactory<UserFactory> */
     use HasFactory, Notifiable, TwoFactorAuthenticatable;
+
+    protected static function booted(): void
+    {
+        static::created(function (User $user) {
+            $user->profile()->create([
+                'travel_allowance' => 0,
+                'travel_allowance_currency' => 'AUD',
+            ]);
+        });
+    }
 
     /**
      * The accessors to append to the model's array form.
@@ -75,6 +88,11 @@ class User extends Authenticatable implements MustVerifyEmail
     public function client(): BelongsTo
     {
         return $this->belongsTo(Client::class);
+    }
+
+    public function profile(): HasOne
+    {
+        return $this->hasOne(Profile::class);
     }
 
     public function sendPasswordResetNotification($token): void
