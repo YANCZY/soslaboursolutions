@@ -18,17 +18,7 @@ class AttendanceController extends Controller
     {
         $user = $request->user();
 
-        $today = now($this->userTimezone($request))->toDateString();
-
-        $todayAttendance = Attendance::query()
-            ->where('employee_id', $user->id)
-            ->whereDate('check_in_date', $today)
-            ->where(function ($query) {
-                $query->where('status', 'checked_in')
-                    ->orWhere('status', 'lunch_break');
-            })
-            ->latest('check_in_time')
-            ->first();
+        $todayAttendance = $this->latestOpenAttendance($request);
 
         $weekStart = now($this->userTimezone($request))->startOfWeek(Carbon::SUNDAY)->toDateString();
         $weekEnd = now($this->userTimezone($request))->endOfWeek(Carbon::SATURDAY)->toDateString();
@@ -53,15 +43,7 @@ class AttendanceController extends Controller
 {
     $now = now($this->userTimezone($request));
 
-    $activeAttendance = Attendance::query()
-        ->where('employee_id', '=', $request->user()->id, 'and')
-        ->whereDate('check_in_date', '=', $now->toDateString(), 'and')
-        ->where(function ($query) {
-            $query->where('status', 'checked_in')
-                ->orWhere('status', 'lunch_break');
-        })
-        ->latest()
-        ->first();
+    $activeAttendance = $this->latestOpenAttendance($request);
 
     if ($activeAttendance) {
         return response()->json([
@@ -176,17 +158,6 @@ class AttendanceController extends Controller
             ], 422);
         }
 
-        return response()->json([
-            'requires_forgot_logout_modal' => true,
-            'message' => 'You forgot to logout.',
-            'attendance' => [
-                'id' => $attendance->id,
-                'check_in_date' => $attendance->check_in_date?->format('Y-m-d'),
-                'check_in_time' => $attendance->check_in_time,
-                'check_out_time' => null,
-            ],
-        ], 422);
-
         $attendance->update([
             'status' => 'checked_out',
             'check_out_time' => $checkOut->format('H:i:s'),
@@ -199,10 +170,10 @@ class AttendanceController extends Controller
     private function maxWorkingSeconds(): int
     {
         // Actual Hours
-        //$maxWorkingSeconds = 19 * 60 * 60;
+        $maxWorkingSeconds = 19 * 60 * 60;
 
         //  TESTING MINUTES
-        $maxWorkingSeconds = 2 * 60;
+        // $maxWorkingSeconds = 2 * 60;
         return $maxWorkingSeconds;
     }
 
@@ -276,15 +247,7 @@ class AttendanceController extends Controller
 
     private function todayAttendance(Request $request): ?Attendance
     {
-         return Attendance::query()
-        ->where('employee_id', '=', $request->user()->id, 'and')
-        ->whereDate('check_in_date', '=', now($this->userTimezone($request))->toDateString(), 'and')
-        ->where(function ($query) {
-            $query->where('status', 'checked_in')
-                ->orWhere('status', 'lunch_break');
-        })
-        ->latest()
-        ->first();
+        return $this->latestOpenAttendance($request);
     }
 
     private function latestOpenAttendance(Request $request): ?Attendance
