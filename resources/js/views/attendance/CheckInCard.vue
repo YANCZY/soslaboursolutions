@@ -167,12 +167,6 @@ const postAttendanceAction = async (url: string) => {
     const rawText = await response.text();
     const data = rawText ? JSON.parse(rawText) : null;
 
-    console.log('attendance response', {
-        url,
-        ok: response.ok,
-        status: response.status,
-        data,
-    });
 
     if (!response.ok) {
         if (data?.requires_forgot_logout_modal && data?.attendance) {
@@ -180,11 +174,6 @@ const postAttendanceAction = async (url: string) => {
             forgotLogoutCheckOutTime.value = '';
             forgotLogoutError.value = '';
             forgotLogoutModalOpen.value = true;
-
-            console.log('forgot modal state', {
-                open: forgotLogoutModalOpen.value,
-                attendance: forgotLogoutAttendance.value,
-            });
 
             return;
         }

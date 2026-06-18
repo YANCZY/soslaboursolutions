@@ -132,18 +132,16 @@ class AttendanceController extends Controller
             $lunchStart = Carbon::parse($attendance->check_in_date->format('Y-m-d').' '.$attendance->lunch_start_time);
             $lunchEnd = Carbon::parse($attendance->check_in_date->format('Y-m-d').' '.$attendance->lunch_end_time);
 
-            $lunchSeconds = (int) floor($lunchStart->diffInSeconds($lunchEnd));
+            $lunchSeconds = (int) floor($lunchEnd->diffInSeconds($lunchStart, true));
         }
 
         $totalWorkingSeconds = (int) floor(
-            max(0, $checkIn->diffInSeconds($checkOut) - $lunchSeconds)
+            max(0, $checkOut->diffInSeconds($checkIn, true) - $lunchSeconds)
         );
 
 
         // Max Working hours
         $maxWorkingSeconds = $this->maxWorkingSeconds();
-
-
 
         if ($totalWorkingSeconds > $maxWorkingSeconds) {
             return response()->json([
@@ -170,10 +168,10 @@ class AttendanceController extends Controller
     private function maxWorkingSeconds(): int
     {
         // Actual Hours
-        $maxWorkingSeconds = 19 * 60 * 60;
+        // $maxWorkingSeconds = 19 * 60 * 60;
 
         //  TESTING MINUTES
-        // $maxWorkingSeconds = 2 * 60;
+        $maxWorkingSeconds = 1 * 60;
         return $maxWorkingSeconds;
     }
 
@@ -210,11 +208,11 @@ class AttendanceController extends Controller
         if ($attendance->lunch_start_time && $attendance->lunch_end_time) {
             $lunchStart = Carbon::parse($attendance->check_in_date->format('Y-m-d') . ' ' . $attendance->lunch_start_time);
             $lunchEnd = Carbon::parse($attendance->check_in_date->format('Y-m-d') . ' ' . $attendance->lunch_end_time);
-            $lunchSeconds = (int) floor($lunchStart->diffInSeconds($lunchEnd));
+            $lunchSeconds = (int) floor($lunchEnd->diffInSeconds($lunchStart, true));
         }
 
         $totalWorkingSeconds = (int) floor(
-            max(0, $checkIn->diffInSeconds($manualCheckOut) - $lunchSeconds)
+            max(0, $manualCheckOut->diffInSeconds($checkIn, true) - $lunchSeconds)
         );
 
         $maxWorkingSeconds = $this->maxWorkingSeconds();
@@ -232,6 +230,70 @@ class AttendanceController extends Controller
         return response()->json([
             'message' => 'Attendance updated successfully.',
             'attendance' => $attendance->fresh(),
+        ]);
+    }
+
+    public function updateAttendance(Request $request, Attendance $attendance): JsonResponse
+    {
+        abort_unless($attendance->employee_id === $request->user()->id, 403);
+
+        $validated = $request->validate([
+            'check_in_date' => ['required', 'date'],
+            'check_in_time' => ['required', 'date_format:H:i'],
+            'check_out_time' => ['required', 'date_format:H:i'],
+            'lunch_start_time' => ['nullable', 'date_format:H:i'],
+            'lunch_end_time' => ['nullable', 'date_format:H:i'],
+        ]);
+
+        if (($validated['lunch_start_time'] && ! $validated['lunch_end_time']) ||
+            (! $validated['lunch_start_time'] && $validated['lunch_end_time'])) {
+            abort(422, 'Lunch start and lunch end must both be provided.');
+        }
+
+        $checkIn = Carbon::parse($validated['check_in_date'].' '.$validated['check_in_time']);
+        $checkOut = Carbon::parse($validated['check_in_date'].' '.$validated['check_out_time']);
+
+        if ($checkOut->lessThanOrEqualTo($checkIn)) {
+            abort(422, 'Check-out time must be later than check-in time.');
+        }
+
+        $lunchSeconds = 0;
+
+        if ($validated['lunch_start_time'] && $validated['lunch_end_time']) {
+            $lunchStart = Carbon::parse($validated['check_in_date'].' '.$validated['lunch_start_time']);
+            $lunchEnd = Carbon::parse($validated['check_in_date'].' '.$validated['lunch_end_time']);
+
+            if ($lunchEnd->lessThanOrEqualTo($lunchStart)) {
+                abort(422, 'Lunch end time must be later than lunch start time.');
+            }
+
+            $lunchSeconds = (int) floor($lunchEnd->diffInSeconds($lunchStart, true));
+        }
+
+        $attendance->update([
+            'check_in_date' => $validated['check_in_date'],
+            'check_in_time' => $validated['check_in_time'],
+            'check_out_time' => $validated['check_out_time'],
+            'lunch_start_time' => $validated['lunch_start_time'],
+            'lunch_end_time' => $validated['lunch_end_time'],
+            'status' => 'checked_out',
+            'total_working_seconds' => (int) floor(max(0, $checkOut->diffInSeconds($checkIn, true) - $lunchSeconds)),
+        ]);
+
+        return response()->json([
+            'message' => 'Attendance updated successfully.',
+            'attendance' => $attendance->fresh('user:id,first_name,last_name'),
+        ]);
+    }
+
+    public function destroyAttendance(Request $request, Attendance $attendance): JsonResponse
+    {
+        abort_unless($attendance->employee_id === $request->user()->id, 403);
+
+        $attendance->delete();
+
+        return response()->json([
+            'message' => 'Attendance deleted successfully.',
         ]);
     }
 

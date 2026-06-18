@@ -1,13 +1,28 @@
 <script setup lang="ts">
-import { Search } from 'lucide-vue-next';
+import { Pencil, Search, Trash2 } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
+import { Button } from '@/components/ui/button';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
+
 import { Input } from '@/components/ui/input';
+
+
+// ========
 import {
     Tooltip,
     TooltipContent,
     TooltipProvider,
     TooltipTrigger,
 } from '@/components/ui/tooltip';
+import EditAttendance from '@/views/attendance/EditAttendance.vue';
+
 
 
 
@@ -30,6 +45,23 @@ type Attendance = {
 const props = defineProps<{
     attendanceRecords: Attendance[];
 }>();
+
+const emit = defineEmits<{
+    'attendance-updated': [];
+}>();
+
+const editDialogOpen = ref(false);
+const deleteDialogOpen = ref(false);
+const selectedRecord = ref<Attendance | null>(null);
+const formError = ref('');
+
+const editForm = ref({
+    check_in_date: '',
+    check_in_time: '',
+    check_out_time: '',
+    lunch_start_time: '',
+    lunch_end_time: '',
+});
 
 const search = ref('');
 
@@ -61,6 +93,10 @@ const formatTime = (time: string | null) => {
             hour: '2-digit',
             minute: '2-digit',
         });
+};
+
+const toTimeInput = (time: string | null) => {
+    return time ? time.slice(0, 5) : '';
 };
 
 const REGULAR_WORK_SECONDS = 8 * 60 * 60;
@@ -101,8 +137,24 @@ const totalLunchBreakSeconds = (record: Attendance) => {
     return secondsBetweenTimes(record.lunch_start_time, record.lunch_end_time);
 };
 
+const totalWorkSeconds = (record: Attendance) => {
+    if (record.total_working_seconds && record.total_working_seconds > 0) {
+        return record.total_working_seconds;
+    }
+
+    if (!record.check_in_time || !record.check_out_time) {
+        return 0;
+    }
+
+    return Math.max(
+        0,
+        secondsBetweenTimes(record.check_in_time, record.check_out_time) -
+            totalLunchBreakSeconds(record),
+    );
+};
+
 const totalOvertimeSeconds = (record: Attendance) => {
-    return Math.max(0, (record.total_working_seconds ?? 0) - REGULAR_WORK_SECONDS);
+    return Math.max(0, totalWorkSeconds(record) - REGULAR_WORK_SECONDS);
 };
 
 const addSecondsToTime = (time: string | null, seconds: number) => {
@@ -171,6 +223,88 @@ const overtimeDetails = (record: Attendance) => {
     ];
 };
 
+const openEditDialog = (record: Attendance) => {
+    selectedRecord.value = record;
+    formError.value = '';
+
+    editForm.value = {
+        check_in_date: record.check_in_date,
+        check_in_time: toTimeInput(record.check_in_time),
+        check_out_time: toTimeInput(record.check_out_time),
+        lunch_start_time: toTimeInput(record.lunch_start_time),
+        lunch_end_time: toTimeInput(record.lunch_end_time),
+    };
+
+    editDialogOpen.value = true;
+};
+
+const openDeleteDialog = (record: Attendance) => {
+    selectedRecord.value = record;
+    formError.value = '';
+    deleteDialogOpen.value = true;
+};
+
+const saveAttendance = async () => {
+    if (!selectedRecord.value) {
+
+        return;
+
+    }
+
+    const response = await fetch(`/attendance/${selectedRecord.value.id}`, {
+        method: 'PUT',
+        credentials: 'same-origin',
+        headers: {
+            Accept: 'application/json',
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ?? '',
+        },
+        body: JSON.stringify(editForm.value),
+    });
+
+    const data = await response.json().catch(() => null);
+
+    if (!response.ok) {
+        formError.value = data?.message ?? 'Unable to update attendance.';
+
+        return;
+    }
+
+    editDialogOpen.value = false;
+    selectedRecord.value = null;
+    emit('attendance-updated');
+};
+
+const deleteAttendance = async () => {
+    if (!selectedRecord.value){
+
+        return;
+
+    }
+
+    const response = await fetch(`/attendance/${selectedRecord.value.id}`, {
+        method: 'DELETE',
+        credentials: 'same-origin',
+        headers: {
+            Accept: 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ?? '',
+        },
+    });
+
+    if (!response.ok) {
+        const data = await response.json().catch(() => null);
+        formError.value = data?.message ?? 'Unable to delete attendance.';
+
+        return;
+    }
+
+    deleteDialogOpen.value = false;
+    selectedRecord.value = null;
+    emit('attendance-updated');
+};
+
 
 
 const filteredAttendanceRecords = computed(() => {
@@ -192,7 +326,7 @@ const filteredAttendanceRecords = computed(() => {
         const date = formatDate(record.check_in_date).toLowerCase();
         const checkIn = formatTime(record.check_in_time).toLowerCase();
         const checkOut = formatTime(record.check_out_time).toLowerCase();
-        const totalWorkHours = formatDuration(record.total_working_seconds).toLowerCase();
+        const totalWorkHours = formatDuration(totalWorkSeconds(record)).toLowerCase();
         const totalLunchBreak = formatDuration(totalLunchBreakSeconds(record)).toLowerCase();
         const totalOvertime = formatDuration(totalOvertimeSeconds(record)).toLowerCase();
 
@@ -243,7 +377,7 @@ const groupedAttendanceRecords = computed(() => {
                 <Input
                     v-model="search"
                     type="search"
-                    placeholder="Search attendance..."
+                    placeholder="Search attendance"
                     class="h-8 pl-8 text-sm"
                 />
             </div>
@@ -261,6 +395,7 @@ const groupedAttendanceRecords = computed(() => {
                             <th class="px-4 py-3 font-weight-bold">Total Work Hours</th>
                             <th class="px-4 py-3 font-weight-bold">Total Lunch Break</th>
                             <th class="px-4 py-3 font-weight-bold">Total Overtime</th>
+                            <th class="px-4 py-3 text-right font-weight-bold">Actions</th>
                         </tr>
                     </thead>
 
@@ -271,7 +406,7 @@ const groupedAttendanceRecords = computed(() => {
                         >
                             <tr class="border-t border-border bg-muted/30">
                                 <td
-                                    colspan="7"
+                                    colspan="8"
                                     class="px-4 py-2 text-sm font-semibold"
                                 >
                                     {{ formatDate(group.date) }}
@@ -296,7 +431,7 @@ const groupedAttendanceRecords = computed(() => {
                                     {{ formatTime(record.check_out_time) }}
                                 </td>
                                 <td class="px-4 py-3">
-                                    {{ formatDuration(record.total_working_seconds) }}
+                                    {{ formatDuration(totalWorkSeconds(record)) }}
                                 </td>
                                 <td class="px-4 py-3">
                                     <TooltipProvider :delay-duration="100">
@@ -360,12 +495,36 @@ const groupedAttendanceRecords = computed(() => {
                                         </Tooltip>
                                     </TooltipProvider>
                                 </td>
+                                <td class="px-4 py-3">
+                                    <div class="flex justify-end gap-1">
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="icon-sm"
+                                            aria-label="Edit attendance"
+                                            @click="openEditDialog(record)"
+                                        >
+                                            <Pencil class="size-4" />
+                                        </Button>
+
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="icon-sm"
+                                            class="text-destructive hover:text-destructive"
+                                            aria-label="Delete attendance"
+                                            @click="openDeleteDialog(record)"
+                                        >
+                                            <Trash2 class="size-4" />
+                                        </Button>
+                                    </div>
+                                </td>
                             </tr>
                         </template>
 
                         <tr v-if="filteredAttendanceRecords.length === 0">
                             <td
-                                colspan="7"
+                                colspan="8"
                                 class="px-4 py-8 text-center text-muted-foreground"
                             >
                                 No attendance records found.
@@ -375,5 +534,37 @@ const groupedAttendanceRecords = computed(() => {
                 </table>
             </div>
         </div>
+        <EditAttendance
+            v-model:open="editDialogOpen"
+            :attendance="selectedRecord"
+            :form="editForm"
+            :error="formError"
+            @update:form="editForm = $event"
+            @save="saveAttendance"
+        />
+        <Dialog v-model:open="deleteDialogOpen">
+            <DialogContent class="w-full max-w-[calc(100%-2rem)] sm:max-w-md">
+                <DialogHeader>
+                    <DialogTitle>Delete attendance record?</DialogTitle>
+                    <DialogDescription>
+                        This action cannot be undone. Are you sure you want to delete this record?
+                    </DialogDescription>
+                </DialogHeader>
+
+                <p v-if="formError" class="text-sm text-destructive">
+                    {{ formError }}
+                </p>
+
+                <DialogFooter>
+                    <Button type="button" variant="destructive" @click="deleteAttendance">
+                        Yes, delete
+                    </Button>
+
+                    <Button type="button" variant="outline" @click="deleteDialogOpen = false">
+                        Cancel
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
     </div>
 </template>
