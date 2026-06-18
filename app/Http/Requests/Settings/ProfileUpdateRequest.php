@@ -23,6 +23,8 @@ class ProfileUpdateRequest extends FormRequest
             'travel_allowance' => ['nullable', 'numeric', 'min:0'],
             'travel_allowance_currency' => ['required', 'string', 'size:3'],
             'salary' => ['nullable', 'numeric', 'min:0'],
+            'start_shift' => ['nullable', 'date_format:H:i'],
+            'end_shift' => ['nullable', 'date_format:H:i'],
         ];
     }
 }

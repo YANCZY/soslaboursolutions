@@ -17,6 +17,7 @@ type Attendance = {
     check_out_time: string | null;
     lunch_start_time: string | null;
     lunch_end_time: string | null;
+    total_working_seconds: number | null;
     user?: AttendanceUser | null;
 };
 
@@ -56,6 +57,48 @@ const formatTime = (time: string | null) => {
         });
 };
 
+const REGULAR_WORK_SECONDS = 8 * 60 * 60;
+
+const formatDuration = (seconds: number | null | undefined) => {
+    if (!seconds || seconds <= 0) {
+        return '-';
+    }
+
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+
+    return `${hours}h ${minutes}m`;
+};
+
+const secondsBetweenTimes = (start: string | null, end: string | null) => {
+    if (!start || !end) {
+        return 0;
+    }
+
+    const [startHours, startMinutes, startSeconds = '0'] = start.split(':');
+    const [endHours, endMinutes, endSeconds = '0'] = end.split(':');
+
+    const startTotal =
+        Number(startHours) * 3600 +
+        Number(startMinutes) * 60 +
+        Number(startSeconds);
+
+    const endTotal =
+        Number(endHours) * 3600 +
+        Number(endMinutes) * 60 +
+        Number(endSeconds);
+
+    return Math.max(0, endTotal - startTotal);
+};
+
+const totalLunchBreakSeconds = (record: Attendance) => {
+    return secondsBetweenTimes(record.lunch_start_time, record.lunch_end_time);
+};
+
+const totalOvertimeSeconds = (record: Attendance) => {
+    return Math.max(0, (record.total_working_seconds ?? 0) - REGULAR_WORK_SECONDS);
+};
+
 const filteredAttendanceRecords = computed(() => {
     const value = search.value.trim().toLowerCase();
 
@@ -68,16 +111,18 @@ const filteredAttendanceRecords = computed(() => {
         const date = formatDate(record.check_in_date).toLowerCase();
         const checkIn = formatTime(record.check_in_time).toLowerCase();
         const checkOut = formatTime(record.check_out_time).toLowerCase();
-        const lunchStart = formatTime(record.lunch_start_time).toLowerCase();
-        const lunchEnd = formatTime(record.lunch_end_time).toLowerCase();
+        const totalWorkHours = formatDuration(record.total_working_seconds).toLowerCase();
+        const totalLunchBreak = formatDuration(totalLunchBreakSeconds(record)).toLowerCase();
+        const totalOvertime = formatDuration(totalOvertimeSeconds(record)).toLowerCase();
 
         return [
             userName,
             date,
             checkIn,
             checkOut,
-            lunchStart,
-            lunchEnd,
+            totalWorkHours,
+            totalLunchBreak,
+            totalOvertime,
         ].some((field) => field.includes(value));
     });
 });
@@ -114,8 +159,9 @@ const filteredAttendanceRecords = computed(() => {
                             <th class="px-4 py-3 font-weight-bold">Date</th>
                             <th class="px-4 py-3 font-weight-bold">Check In</th>
                             <th class="px-4 py-3 font-weight-bold">Check Out</th>
-                            <th class="px-4 py-3 font-weight-bold">Lunch Start</th>
-                            <th class="px-4 py-3 font-weight-bold">Lunch End</th>
+                            <th class="px-4 py-3 font-weight-bold">Total Work Hours</th>
+                            <th class="px-4 py-3 font-weight-bold">Total Lunch Break</th>
+                            <th class="px-4 py-3 font-weight-bold">Total Overtime</th>
                         </tr>
                     </thead>
 
@@ -138,16 +184,19 @@ const filteredAttendanceRecords = computed(() => {
                                 {{ formatTime(record.check_out_time) }}
                             </td>
                             <td class="px-4 py-3">
-                                {{ formatTime(record.lunch_start_time) }}
+                                {{ formatDuration(record.total_working_seconds) }}
                             </td>
                             <td class="px-4 py-3">
-                                {{ formatTime(record.lunch_end_time) }}
+                                {{ formatDuration(totalLunchBreakSeconds(record)) }}
+                            </td>
+                            <td class="px-4 py-3">
+                                {{ formatDuration(totalOvertimeSeconds(record)) }}
                             </td>
                         </tr>
 
                         <tr v-if="filteredAttendanceRecords.length === 0">
                             <td
-                                colspan="6"
+                                colspan="7"
                                 class="px-4 py-8 text-center text-muted-foreground"
                             >
                                 No attendance records found.

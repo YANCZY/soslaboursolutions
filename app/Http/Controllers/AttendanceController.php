@@ -18,16 +18,7 @@ class AttendanceController extends Controller
     {
         $user = $request->user();
 
-        $today = now($this->userTimezone($request))->toDateString();
-
-        $todayAttendance = Attendance::query()
-            ->where('employee_id', '=', $user->id, 'and')
-            ->where(function ($query) {
-                $query->where('status', 'checked_in')
-                    ->orWhere('status', 'lunch_break');
-            })
-            ->latest()
-            ->first();
+        $todayAttendance = $this->latestOpenAttendance($request);
 
         $weekStart = now($this->userTimezone($request))->startOfWeek(Carbon::SUNDAY)->toDateString();
         $weekEnd = now($this->userTimezone($request))->endOfWeek(Carbon::SATURDAY)->toDateString();
@@ -52,15 +43,7 @@ class AttendanceController extends Controller
 {
     $now = now($this->userTimezone($request));
 
-    $activeAttendance = Attendance::query()
-        ->where('employee_id', '=', $request->user()->id, 'and')
-        ->whereDate('check_in_date', '=', $now->toDateString(), 'and')
-        ->where(function ($query) {
-            $query->where('status', 'checked_in')
-                ->orWhere('status', 'lunch_break');
-        })
-        ->latest()
-        ->first();
+    $activeAttendance = $this->latestOpenAttendance($request);
 
     if ($activeAttendance) {
         return response()->json([
@@ -126,7 +109,7 @@ class AttendanceController extends Controller
 
     public function checkOut(Request $request): JsonResponse
     {
-        $attendance = $this->todayAttendance($request);
+       $attendance = $this->latestOpenAttendance($request);
 
         if (! $attendance || ! $attendance->check_in_time) {
             abort(422, 'You must check in first.');
@@ -156,6 +139,25 @@ class AttendanceController extends Controller
             max(0, $checkIn->diffInSeconds($checkOut) - $lunchSeconds)
         );
 
+
+        // Max Working hours
+        $maxWorkingSeconds = $this->maxWorkingSeconds();
+
+
+
+        if ($totalWorkingSeconds > $maxWorkingSeconds) {
+            return response()->json([
+                'requires_forgot_logout_modal' => true,
+                'message' => 'You forgot to logout.',
+                'attendance' => [
+                    'id' => $attendance->id,
+                    'check_in_date' => $attendance->check_in_date?->format('Y-m-d'),
+                    'check_in_time' => $attendance->check_in_time,
+                    'check_out_time' => null,
+                ],
+            ], 422);
+        }
+
         $attendance->update([
             'status' => 'checked_out',
             'check_out_time' => $checkOut->format('H:i:s'),
@@ -164,6 +166,75 @@ class AttendanceController extends Controller
 
         return response()->json(['attendance' => $attendance->fresh()]);
     }
+
+    private function maxWorkingSeconds(): int
+    {
+        // Actual Hours
+        $maxWorkingSeconds = 19 * 60 * 60;
+
+        //  TESTING MINUTES
+        // $maxWorkingSeconds = 2 * 60;
+        return $maxWorkingSeconds;
+    }
+
+    public function storeForgotCheckOut(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'attendance_id' => ['required', 'integer', 'exists:attendance,id'],
+            'check_out_time' => ['required', 'date_format:H:i'],
+        ]);
+
+        $attendance = Attendance::query()
+            ->where('id', $validated['attendance_id'])
+            ->where('employee_id', $request->user()->id)
+            ->firstOrFail();
+
+        if (! $attendance->check_in_time) {
+            abort(422, 'Check-in time is missing.');
+        }
+
+        $checkIn = Carbon::parse(
+            $attendance->check_in_date->format('Y-m-d') . ' ' . $attendance->check_in_time
+        );
+
+        $manualCheckOut = Carbon::parse(
+            $attendance->check_in_date->format('Y-m-d') . ' ' . $validated['check_out_time']
+        );
+
+        if ($manualCheckOut->lessThanOrEqualTo($checkIn)) {
+            abort(422, 'Check-out time must be later than check-in time.');
+        }
+
+        $lunchSeconds = 0;
+
+        if ($attendance->lunch_start_time && $attendance->lunch_end_time) {
+            $lunchStart = Carbon::parse($attendance->check_in_date->format('Y-m-d') . ' ' . $attendance->lunch_start_time);
+            $lunchEnd = Carbon::parse($attendance->check_in_date->format('Y-m-d') . ' ' . $attendance->lunch_end_time);
+            $lunchSeconds = (int) floor($lunchStart->diffInSeconds($lunchEnd));
+        }
+
+        $totalWorkingSeconds = (int) floor(
+            max(0, $checkIn->diffInSeconds($manualCheckOut) - $lunchSeconds)
+        );
+
+        $maxWorkingSeconds = $this->maxWorkingSeconds();
+
+        if ($totalWorkingSeconds > $maxWorkingSeconds) {
+            abort(422, 'Check-out time exceeds the maximum allowed working hours.');
+        }
+
+        $attendance->update([
+            'status' => 'checked_out',
+            'check_out_time' => $manualCheckOut->format('H:i:s'),
+            'total_working_seconds' => $totalWorkingSeconds,
+        ]);
+
+        return response()->json([
+            'message' => 'Attendance updated successfully.',
+            'attendance' => $attendance->fresh(),
+        ]);
+    }
+
 
     private function userTimezone(Request $request): string
     {
@@ -176,15 +247,18 @@ class AttendanceController extends Controller
 
     private function todayAttendance(Request $request): ?Attendance
     {
-         return Attendance::query()
-        ->where('employee_id', '=', $request->user()->id, 'and')
-        ->whereDate('check_in_date', '=', now($this->userTimezone($request))->toDateString(), 'and')
-        ->where(function ($query) {
-            $query->where('status', 'checked_in')
-                ->orWhere('status', 'lunch_break');
-        })
-        ->latest()
-        ->first();
+        return $this->latestOpenAttendance($request);
+    }
+
+    private function latestOpenAttendance(Request $request): ?Attendance
+    {
+        return Attendance::query()
+            ->where('employee_id', $request->user()->id)
+            ->whereNotNull('check_in_time')
+            ->whereNull('check_out_time')
+            ->latest('check_in_date')
+            ->latest('check_in_time')
+            ->first();
     }
 
     /**

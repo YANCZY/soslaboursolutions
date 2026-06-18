@@ -56,6 +56,8 @@ class ProfileController extends Controller
             'travel_allowance',
             'travel_allowance_currency',
             'salary',
+            'start_shift',
+            'end_shift',
         ]));
 
         Inertia::flash('toast', ['type' => 'success', 'message' => __('Profile updated.')]);
