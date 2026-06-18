@@ -23,12 +23,15 @@ import {
 } from '@/components/ui/tooltip';
 import EditAttendance from '@/views/attendance/EditAttendance.vue';
 
-
-
+type AttendanceProfile = {
+    start_shift: string | null;
+    end_shift: string | null;
+};
 
 type AttendanceUser = {
     first_name: string;
     last_name: string;
+    profile?: AttendanceProfile | null;
 };
 
 type Attendance = {
@@ -99,7 +102,7 @@ const toTimeInput = (time: string | null) => {
     return time ? time.slice(0, 5) : '';
 };
 
-const REGULAR_WORK_SECONDS = 8 * 60 * 60;
+
 
 const formatDuration = (seconds: number | null | undefined) => {
     if (!seconds || seconds <= 0) {
@@ -133,41 +136,98 @@ const secondsBetweenTimes = (start: string | null, end: string | null) => {
     return Math.max(0, endTotal - startTotal);
 };
 
-const totalLunchBreakSeconds = (record: Attendance) => {
-    return secondsBetweenTimes(record.lunch_start_time, record.lunch_end_time);
-};
-
-const totalWorkSeconds = (record: Attendance) => {
-    if (record.total_working_seconds && record.total_working_seconds > 0) {
-        return record.total_working_seconds;
-    }
-
-    if (!record.check_in_time || !record.check_out_time) {
-        return 0;
-    }
-
-    return Math.max(
-        0,
-        secondsBetweenTimes(record.check_in_time, record.check_out_time) -
-            totalLunchBreakSeconds(record),
-    );
-};
-
-const totalOvertimeSeconds = (record: Attendance) => {
-    return Math.max(0, totalWorkSeconds(record) - REGULAR_WORK_SECONDS);
-};
-
-const addSecondsToTime = (time: string | null, seconds: number) => {
+const timeToSeconds = (time: string | null) => {
     if (!time) {
         return null;
     }
 
-    const [hours, minutes, timeSeconds = '0'] = time.split(':');
+    const [hours, minutes, seconds = '0'] = time.split(':');
 
-    const date = new Date(2000, 0, 1, Number(hours), Number(minutes), Number(timeSeconds));
-    date.setSeconds(date.getSeconds() + seconds);
+    return Number(hours) * 3600 + Number(minutes) * 60 + Number(seconds);
+};
 
-    return date.toTimeString().slice(0, 8);
+const overlapSeconds = (
+    start: number,
+    end: number,
+    windowStart: number,
+    windowEnd: number,
+) => {
+    return Math.max(0, Math.min(end, windowEnd) - Math.max(start, windowStart));
+};
+
+const totalLunchBreakSeconds = (record: Attendance) => {
+    return secondsBetweenTimes(record.lunch_start_time, record.lunch_end_time);
+};
+
+const shiftStartTime = (record: Attendance) => {
+    return record.user?.profile?.start_shift ?? null;
+};
+
+const shiftEndTime = (record: Attendance) => {
+    return record.user?.profile?.end_shift ?? null;
+};
+
+const checkInIndicator = (record: Attendance) => {
+    const startShift = shiftStartTime(record);
+
+    if (!record.check_in_time || !startShift) {
+        return null;
+    }
+
+    const difference = secondsBetweenTimes(startShift, record.check_in_time);
+
+    if (difference > 0) {
+        return 'Late';
+    }
+
+    if (secondsBetweenTimes(record.check_in_time, startShift) > 0) {
+        return 'Early';
+    }
+
+    return null;
+};
+
+const totalWorkSeconds = (record: Attendance) => {
+    const checkIn = timeToSeconds(record.check_in_time);
+    const checkOut = timeToSeconds(record.check_out_time);
+    const startShift = timeToSeconds(shiftStartTime(record));
+    const endShift = timeToSeconds(shiftEndTime(record));
+
+    if (checkIn === null || checkOut === null) {
+        return 0;
+    }
+
+    if (startShift === null || endShift === null) {
+        return Math.max(
+            0,
+            secondsBetweenTimes(record.check_in_time, record.check_out_time) -
+                totalLunchBreakSeconds(record),
+        );
+    }
+
+    const regularSeconds = overlapSeconds(checkIn, checkOut, startShift, endShift);
+
+    const lunchStart = timeToSeconds(record.lunch_start_time);
+    const lunchEnd = timeToSeconds(record.lunch_end_time);
+
+    const lunchDuringRegular =
+        lunchStart !== null && lunchEnd !== null
+            ? overlapSeconds(lunchStart, lunchEnd, startShift, endShift)
+            : 0;
+
+    return Math.max(0, regularSeconds - lunchDuringRegular);
+};
+
+const totalOvertimeSeconds = (record: Attendance) => {
+    const checkIn = timeToSeconds(record.check_in_time);
+    const checkOut = timeToSeconds(record.check_out_time);
+    const endShift = timeToSeconds(shiftEndTime(record));
+
+    if (checkIn === null || checkOut === null || endShift === null) {
+        return 0;
+    }
+
+    return Math.max(0, checkOut - Math.max(checkIn, endShift));
 };
 
 const lunchBreakDetails = (record: Attendance) => {
@@ -193,12 +253,14 @@ const lunchBreakDetails = (record: Attendance) => {
 };
 
 const overtimeStartTime = (record: Attendance) => {
-    const lunchSeconds = totalLunchBreakSeconds(record);
+    const checkIn = timeToSeconds(record.check_in_time);
+    const endShift = timeToSeconds(shiftEndTime(record));
 
-    return addSecondsToTime(
-        record.check_in_time,
-        REGULAR_WORK_SECONDS + lunchSeconds,
-    );
+    if (checkIn === null || endShift === null) {
+        return null;
+    }
+
+    return checkIn > endShift ? record.check_in_time : shiftEndTime(record);
 };
 
 const overtimeDetails = (record: Attendance) => {
@@ -425,7 +487,21 @@ const groupedAttendanceRecords = computed(() => {
                                     {{ formatDate(record.check_in_date) }}
                                 </td>
                                 <td class="px-4 py-3">
-                                    {{ formatTime(record.check_in_time) }}
+                                    <div class="flex flex-wrap items-center gap-2">
+                                        <span>{{ formatTime(record.check_in_time) }}</span>
+
+                                        <span
+                                            v-if="checkInIndicator(record)"
+                                            class="rounded-md border px-1.5 py-0.5 text-xs font-medium"
+                                            :class="
+                                                checkInIndicator(record) === 'Late'
+                                                    ? 'border-red-200 bg-red-50 text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300'
+                                                    : 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/50 dark:bg-emerald-950/30 dark:text-emerald-300'
+                                            "
+                                        >
+                                            {{ checkInIndicator(record) }}
+                                        </span>
+                                    </div>
                                 </td>
                                 <td class="px-4 py-3">
                                     {{ formatTime(record.check_out_time) }}
