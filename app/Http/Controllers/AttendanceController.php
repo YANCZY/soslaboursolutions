@@ -24,7 +24,10 @@ class AttendanceController extends Controller
         $weekEnd = now($this->userTimezone($request))->endOfWeek(Carbon::SATURDAY)->toDateString();
 
         $weeklyAttendance = Attendance::query()
-            ->with('user:id,first_name,last_name')
+            ->with([
+                'user:id,first_name,last_name',
+                'user.profile:id,user_id,start_shift,end_shift',
+            ])
             ->where('employee_id', $user->id)
             ->whereBetween('check_in_date', [$weekStart, $weekEnd])
             ->orderByDesc('check_in_date')
