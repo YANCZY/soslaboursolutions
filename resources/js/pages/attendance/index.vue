@@ -40,7 +40,10 @@ defineOptions({
         </div>
 
         <Card>
-             <AttendanceTable :attendance-records="weeklyAttendance" />
+             <AttendanceTable
+                :attendance-records="weeklyAttendance"
+                @attendance-updated="refreshAttendance"
+            />
         </Card>
     </div>
 </template>
