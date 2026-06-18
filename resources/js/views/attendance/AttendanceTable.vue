@@ -2,6 +2,12 @@
 import { Search } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
 import { Input } from '@/components/ui/input';
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from '@/components/ui/tooltip';
 
 
 
@@ -99,14 +105,89 @@ const totalOvertimeSeconds = (record: Attendance) => {
     return Math.max(0, (record.total_working_seconds ?? 0) - REGULAR_WORK_SECONDS);
 };
 
+const addSecondsToTime = (time: string | null, seconds: number) => {
+    if (!time) {
+        return null;
+    }
+
+    const [hours, minutes, timeSeconds = '0'] = time.split(':');
+
+    const date = new Date(2000, 0, 1, Number(hours), Number(minutes), Number(timeSeconds));
+    date.setSeconds(date.getSeconds() + seconds);
+
+    return date.toTimeString().slice(0, 8);
+};
+
+const lunchBreakDetails = (record: Attendance) => {
+    if (!record.lunch_start_time || !record.lunch_end_time) {
+        return [
+            {
+                label: 'Lunch Break',
+                value: 'No lunch break recorded',
+            },
+        ];
+    }
+
+    return [
+        {
+            label: 'Lunch Break Start',
+            value: formatTime(record.lunch_start_time),
+        },
+        {
+            label: 'Lunch Break End',
+            value: formatTime(record.lunch_end_time),
+        },
+    ];
+};
+
+const overtimeStartTime = (record: Attendance) => {
+    const lunchSeconds = totalLunchBreakSeconds(record);
+
+    return addSecondsToTime(
+        record.check_in_time,
+        REGULAR_WORK_SECONDS + lunchSeconds,
+    );
+};
+
+const overtimeDetails = (record: Attendance) => {
+    if (totalOvertimeSeconds(record) <= 0 || !record.check_out_time) {
+        return [
+            {
+                label: 'Overtime',
+                value: 'No overtime recorded',
+            },
+        ];
+    }
+
+    return [
+        {
+            label: 'Overtime Start',
+            value: formatTime(overtimeStartTime(record)),
+        },
+        {
+            label: 'Overtime End',
+            value: formatTime(record.check_out_time),
+        },
+    ];
+};
+
+
+
 const filteredAttendanceRecords = computed(() => {
     const value = search.value.trim().toLowerCase();
 
+    const sortedRecords = [...props.attendanceRecords].sort((a, b) => {
+        const first = `${a.check_in_date} ${a.check_in_time ?? '00:00:00'}`;
+        const second = `${b.check_in_date} ${b.check_in_time ?? '00:00:00'}`;
+
+        return second.localeCompare(first);
+    });
+
     if (!value) {
-        return props.attendanceRecords;
+        return sortedRecords;
     }
 
-    return props.attendanceRecords.filter((record) => {
+    return sortedRecords.filter((record) => {
         const userName = formatUserName(record.user).toLowerCase();
         const date = formatDate(record.check_in_date).toLowerCase();
         const checkIn = formatTime(record.check_in_time).toLowerCase();
@@ -125,6 +206,24 @@ const filteredAttendanceRecords = computed(() => {
             totalOvertime,
         ].some((field) => field.includes(value));
     });
+});
+
+
+const groupedAttendanceRecords = computed(() => {
+    const groups = new Map<string, Attendance[]>();
+
+    for (const record of filteredAttendanceRecords.value) {
+        if (!groups.has(record.check_in_date)) {
+            groups.set(record.check_in_date, []);
+        }
+
+        groups.get(record.check_in_date)?.push(record);
+    }
+
+    return Array.from(groups, ([date, records]) => ({
+        date,
+        records,
+    }));
 });
 </script>
 
@@ -166,33 +265,103 @@ const filteredAttendanceRecords = computed(() => {
                     </thead>
 
                     <tbody>
-                        <tr
-                            v-for="record in filteredAttendanceRecords"
-                            :key="record.id"
-                            class="border-t border-border"
+                        <template
+                            v-for="group in groupedAttendanceRecords"
+                            :key="group.date"
                         >
-                            <td class="px-4 py-3 font-medium">
-                                {{ formatUserName(record.user) }}
-                            </td>
-                            <td class="px-4 py-3">
-                                {{ formatDate(record.check_in_date) }}
-                            </td>
-                            <td class="px-4 py-3">
-                                {{ formatTime(record.check_in_time) }}
-                            </td>
-                            <td class="px-4 py-3">
-                                {{ formatTime(record.check_out_time) }}
-                            </td>
-                            <td class="px-4 py-3">
-                                {{ formatDuration(record.total_working_seconds) }}
-                            </td>
-                            <td class="px-4 py-3">
-                                {{ formatDuration(totalLunchBreakSeconds(record)) }}
-                            </td>
-                            <td class="px-4 py-3">
-                                {{ formatDuration(totalOvertimeSeconds(record)) }}
-                            </td>
-                        </tr>
+                            <tr class="border-t border-border bg-muted/30">
+                                <td
+                                    colspan="7"
+                                    class="px-4 py-2 text-sm font-semibold"
+                                >
+                                    {{ formatDate(group.date) }}
+                                </td>
+                            </tr>
+
+                            <tr
+                                v-for="record in group.records"
+                                :key="record.id"
+                                class="border-t border-border"
+                            >
+                                <td class="px-4 py-3 font-medium">
+                                    {{ formatUserName(record.user) }}
+                                </td>
+                                <td class="px-4 py-3">
+                                    {{ formatDate(record.check_in_date) }}
+                                </td>
+                                <td class="px-4 py-3">
+                                    {{ formatTime(record.check_in_time) }}
+                                </td>
+                                <td class="px-4 py-3">
+                                    {{ formatTime(record.check_out_time) }}
+                                </td>
+                                <td class="px-4 py-3">
+                                    {{ formatDuration(record.total_working_seconds) }}
+                                </td>
+                                <td class="px-4 py-3">
+                                    <TooltipProvider :delay-duration="100">
+                                        <Tooltip>
+                                            <TooltipTrigger as-child>
+                                                <button
+                                                    type="button"
+                                                    class="inline-flex min-h-8 max-w-full items-center rounded-md px-2 text-left transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                                                >
+                                                    {{ formatDuration(totalLunchBreakSeconds(record)) }}
+                                                </button>
+                                            </TooltipTrigger>
+
+                                            <TooltipContent
+                                                side="top"
+                                                align="center"
+                                                class="max-w-[calc(100vw-2rem)] border border-border bg-popover px-3 py-2 text-popover-foreground shadow-md"
+                                            >
+                                                <div class="space-y-1">
+                                                    <div
+                                                        v-for="detail in lunchBreakDetails(record)"
+                                                        :key="detail.label"
+                                                        class="flex flex-col gap-0.5 sm:flex-row sm:items-center sm:gap-2"
+                                                    >
+                                                        <span class="font-medium">{{ detail.label }}:</span>
+                                                        <span class="text-muted-foreground">{{ detail.value }}</span>
+                                                    </div>
+                                                </div>
+                                            </TooltipContent>
+                                        </Tooltip>
+                                    </TooltipProvider>
+                                </td>
+                                <td class="px-4 py-3">
+                                    <TooltipProvider :delay-duration="100">
+                                        <Tooltip>
+                                            <TooltipTrigger as-child>
+                                                <button
+                                                    type="button"
+                                                    class="inline-flex min-h-8 max-w-full items-center rounded-md px-2 text-left transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                                                >
+                                                    {{ formatDuration(totalOvertimeSeconds(record)) }}
+                                                </button>
+                                            </TooltipTrigger>
+
+                                            <TooltipContent
+                                                side="top"
+                                                align="center"
+                                                class="max-w-[calc(100vw-2rem)] border border-border bg-popover px-3 py-2 text-popover-foreground shadow-md"
+                                            >
+                                                <div class="space-y-1">
+                                                    <div
+                                                        v-for="detail in overtimeDetails(record)"
+                                                        :key="detail.label"
+                                                        class="flex flex-col gap-0.5 sm:flex-row sm:items-center sm:gap-2"
+                                                    >
+                                                        <span class="font-medium">{{ detail.label }}:</span>
+                                                        <span class="text-muted-foreground">{{ detail.value }}</span>
+                                                    </div>
+                                                </div>
+                                            </TooltipContent>
+                                        </Tooltip>
+                                    </TooltipProvider>
+                                </td>
+                            </tr>
+                        </template>
 
                         <tr v-if="filteredAttendanceRecords.length === 0">
                             <td

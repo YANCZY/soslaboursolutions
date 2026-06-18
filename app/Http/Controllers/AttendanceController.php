@@ -27,8 +27,8 @@ class AttendanceController extends Controller
             ->with('user:id,first_name,last_name')
             ->where('employee_id', $user->id)
             ->whereBetween('check_in_date', [$weekStart, $weekEnd])
-            ->orderBy('check_in_date')
-            ->orderBy('check_in_time')
+            ->orderByDesc('check_in_date')
+            ->orderByDesc('check_in_time')
             ->get();
 
 
