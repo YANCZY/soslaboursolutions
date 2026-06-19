@@ -36,6 +36,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('attendance/lunch/start', [AttendanceController::class, 'startLunch'])->name('attendance.lunch.start');
     Route::post('attendance/lunch/end', [AttendanceController::class, 'endLunch'])->name('attendance.lunch.end');
     Route::post('attendance/check-out', [AttendanceController::class, 'checkOut'])->name('attendance.check-out');
+    Route::post('attendance/forgot-check-out', [AttendanceController::class, 'storeForgotCheckOut'])->name('attendance.forgot-check-out');
+    Route::put('attendance/{attendance}', [AttendanceController::class, 'updateAttendance'])->name('attendance.update');
+    Route::delete('attendance/{attendance}', [AttendanceController::class, 'destroyAttendance'])->name('attendance.destroy');
 });
 
 

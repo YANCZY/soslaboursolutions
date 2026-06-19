@@ -17,6 +17,14 @@ class ProfileUpdateRequest extends FormRequest
      */
     public function rules(): array
     {
-        return $this->profileRules($this->user()->id);
+        return [
+            ...$this->profileRules($this->user()->id),
+            'job_role' => ['nullable', 'string', 'max:255'],
+            'travel_allowance' => ['nullable', 'numeric', 'min:0'],
+            'travel_allowance_currency' => ['required', 'string', 'size:3'],
+            'salary' => ['nullable', 'numeric', 'min:0'],
+            'start_shift' => ['nullable', 'date_format:H:i'],
+            'end_shift' => ['nullable', 'date_format:H:i'],
+        ];
     }
 }

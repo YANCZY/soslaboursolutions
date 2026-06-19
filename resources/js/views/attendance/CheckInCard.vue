@@ -6,6 +6,10 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 
+// ==========
+import ForgotCheckoutModal from '@/views/attendance/ForgotCheckoutModal.vue';
+
+
 const page = usePage();
 
 type Attendance = {
@@ -28,6 +32,11 @@ const emit = defineEmits<{
 }>();
 
 const activeAttendance = ref<Attendance | null>(props.attendance);
+
+const forgotLogoutModalOpen = ref(false);
+const forgotLogoutAttendance = ref<Attendance | null>(null);
+const forgotLogoutCheckOutTime = ref('');
+const forgotLogoutError = ref('');
 
 const currentDateTime = ref(new Date());
 const checkInAt = computed(() => {
@@ -155,16 +164,35 @@ const postAttendanceAction = async (url: string) => {
         },
     });
 
+    const rawText = await response.text();
+    const data = rawText ? JSON.parse(rawText) : null;
+
+
     if (!response.ok) {
+        if (data?.requires_forgot_logout_modal && data?.attendance) {
+            forgotLogoutAttendance.value = data.attendance;
+            forgotLogoutCheckOutTime.value = '';
+            forgotLogoutError.value = '';
+            forgotLogoutModalOpen.value = true;
 
-    console.error(await response.text());
+            return;
+        }
 
-    return;
-}
+        alert(data?.message ?? 'Attendance request failed.');
 
-    const data = await response.json();
+        return;
+    }
 
-    activeAttendance.value = data.attendance;
+    if (data?.action === 'requires_forgot_checkout' && data?.attendance) {
+        forgotLogoutAttendance.value = data.attendance;
+        forgotLogoutCheckOutTime.value = '';
+        forgotLogoutError.value = '';
+        forgotLogoutModalOpen.value = true;
+
+        return;
+    }
+
+    activeAttendance.value = data?.attendance ?? null;
     emit('attendance-updated');
 };
 
@@ -186,6 +214,50 @@ const toggleLunchBreak = async () => {
     }
 
     await postAttendanceAction('/attendance/lunch/start');
+};
+
+const saveForgotLogout = async () => {
+    forgotLogoutError.value = '';
+
+    if (!forgotLogoutAttendance.value?.id || !forgotLogoutCheckOutTime.value) {
+        forgotLogoutError.value = 'Check-out time is required.';
+
+        return;
+    }
+
+    const response = await fetch('/attendance/forgot-check-out', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {
+            Accept: 'application/json',
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-Timezone': Intl.DateTimeFormat().resolvedOptions().timeZone,
+            'X-CSRF-TOKEN':
+                document
+                    .querySelector('meta[name="csrf-token"]')
+                    ?.getAttribute('content') ?? '',
+        },
+        body: JSON.stringify({
+            attendance_id: forgotLogoutAttendance.value.id,
+            check_out_time: forgotLogoutCheckOutTime.value,
+        }),
+    });
+
+    const data = await response.json().catch(() => null);
+
+    if (!response.ok) {
+        forgotLogoutError.value = data?.message ?? 'Unable to save check-out time.';
+
+        return;
+    }
+
+    activeAttendance.value = null;
+    forgotLogoutModalOpen.value = false;
+    forgotLogoutAttendance.value = null;
+    forgotLogoutCheckOutTime.value = '';
+    forgotLogoutError.value = '';
+    emit('attendance-updated');
 };
 
 onMounted(() => {
@@ -281,4 +353,13 @@ onBeforeUnmount(() => {
                     </div>
                 </CardContent>
             </Card>
+            <ForgotCheckoutModal
+                :open="forgotLogoutModalOpen"
+                :attendance="forgotLogoutAttendance"
+                :check-out-time="forgotLogoutCheckOutTime"
+                :error="forgotLogoutError"
+                @update:open="forgotLogoutModalOpen = $event"
+                @update:check-out-time="forgotLogoutCheckOutTime = $event"
+                @save="saveForgotLogout"
+            />
 </template>
