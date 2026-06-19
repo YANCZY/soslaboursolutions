@@ -171,10 +171,10 @@ class AttendanceController extends Controller
     private function maxWorkingSeconds(): int
     {
         // Actual Hours
-        // $maxWorkingSeconds = 19 * 60 * 60;
+        $maxWorkingSeconds = 19 * 60 * 60;
 
         //  TESTING MINUTES
-        $maxWorkingSeconds = 1 * 60;
+        // $maxWorkingSeconds = 1 * 60;
         return $maxWorkingSeconds;
     }
 

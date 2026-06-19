@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { Pencil, Search, Trash2 } from 'lucide-vue-next';
-import { computed, ref } from 'vue';
+import { ChevronLeft, ChevronRight, Pencil, Search, Trash2 } from 'lucide-vue-next';
+import { computed, ref, watch } from 'vue';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
     Dialog,
     DialogContent,
@@ -12,6 +13,13 @@ import {
 } from '@/components/ui/dialog';
 
 import { Input } from '@/components/ui/input';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 
 
 // ========
@@ -67,6 +75,77 @@ const editForm = ref({
 });
 
 const search = ref('');
+const rowsPerPage = ref('10');
+const currentPage = ref(1);
+const selectedAttendanceIds = ref<number[]>([]);
+
+const hasSelectedAttendance = computed(() => {
+    return selectedAttendanceIds.value.length > 0;
+});
+
+const isAttendanceSelected = (attendanceId: number) => {
+    return selectedAttendanceIds.value.includes(attendanceId);
+};
+
+const toggleAttendanceSelection = (
+    attendanceId: number,
+    selected: boolean | 'indeterminate',
+) => {
+    if (selected === true) {
+        if (!selectedAttendanceIds.value.includes(attendanceId)) {
+            selectedAttendanceIds.value = [
+                ...selectedAttendanceIds.value,
+                attendanceId,
+            ];
+        }
+
+        return;
+    }
+
+    selectedAttendanceIds.value = selectedAttendanceIds.value.filter(
+        (id) => id !== attendanceId,
+    );
+};
+
+const groupSelectionState = (
+    records: Attendance[],
+): boolean | 'indeterminate' => {
+    const selectedRecordCount = records.filter((record) =>
+        selectedAttendanceIds.value.includes(record.id),
+    ).length;
+
+    if (selectedRecordCount === 0) {
+        return false;
+    }
+
+    if (selectedRecordCount === records.length) {
+        return true;
+    }
+
+    return 'indeterminate';
+};
+
+const toggleGroupSelection = (
+    records: Attendance[],
+    selected: boolean | 'indeterminate',
+) => {
+    const groupRecordIds = records.map((record) => record.id);
+
+    if (selected === true) {
+        selectedAttendanceIds.value = Array.from(
+            new Set([
+                ...selectedAttendanceIds.value,
+                ...groupRecordIds,
+            ]),
+        );
+
+        return;
+    }
+
+    selectedAttendanceIds.value = selectedAttendanceIds.value.filter(
+        (id) => !groupRecordIds.includes(id),
+    );
+};
 
 const formatUserName = (user?: AttendanceUser | null) => {
     if (!user) {
@@ -404,11 +483,49 @@ const filteredAttendanceRecords = computed(() => {
     });
 });
 
+const totalPages = computed(() => {
+    return Math.max(1, Math.ceil(filteredAttendanceRecords.value.length / Number(rowsPerPage.value)));
+});
+
+const paginatedAttendanceRecords = computed(() => {
+    const start = (currentPage.value - 1) * Number(rowsPerPage.value);
+    const end = start + Number(rowsPerPage.value);
+
+    return filteredAttendanceRecords.value.slice(start, end);
+});
+
+const paginationStart = computed(() => {
+    if (filteredAttendanceRecords.value.length === 0) {
+        return 0;
+    }
+
+    return (currentPage.value - 1) * Number(rowsPerPage.value) + 1;
+});
+
+const paginationEnd = computed(() => {
+    return Math.min(
+        currentPage.value * Number(rowsPerPage.value),
+        filteredAttendanceRecords.value.length,
+    );
+});
+
+const goToPreviousPage = () => {
+    currentPage.value = Math.max(1, currentPage.value - 1);
+};
+
+const goToNextPage = () => {
+    currentPage.value = Math.min(totalPages.value, currentPage.value + 1);
+};
+
+watch([search, rowsPerPage], () => {
+    currentPage.value = 1;
+});
+
 
 const groupedAttendanceRecords = computed(() => {
     const groups = new Map<string, Attendance[]>();
 
-    for (const record of filteredAttendanceRecords.value) {
+    for (const record of paginatedAttendanceRecords.value) {
         if (!groups.has(record.check_in_date)) {
             groups.set(record.check_in_date, []);
         }
@@ -421,35 +538,71 @@ const groupedAttendanceRecords = computed(() => {
         records,
     }));
 });
+
+const visibleTableRowCount = computed(() => {
+    return groupedAttendanceRecords.value.reduce(
+        (total, group) => total + 1 + group.records.length,
+        0,
+    );
+});
+
 </script>
 
 <template>
     <div class="mx-auto w-[96%] space-y-3">
         <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <h2 class="text-lg font-semibold tracking-tight">
-                Attendance
-            </h2>
+            <div class="flex flex-wrap items-center gap-3">
+                <h2 class="text-lg font-semibold tracking-tight">
+                    Attendance
+                </h2>
 
-            <div
-                class="relative w-44 transition-[width] duration-200 ease-in-out hover:w-64 focus-within:w-64"
-            >
-                <Search
-                    class="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground"
-                />
-                <Input
-                    v-model="search"
-                    type="search"
-                    placeholder="Search attendance"
-                    class="h-8 pl-8 text-sm"
-                />
+                <Button
+                    v-if="hasSelectedAttendance"
+                    type="button"
+                    size="sm"
+                >
+                    Send Timesheet For Approval
+                </Button>
+            </div>
+
+            <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
+                <Select v-model="rowsPerPage">
+                    <SelectTrigger class="h-8 w-24">
+                        <SelectValue />
+                    </SelectTrigger>
+
+                    <SelectContent>
+                        <SelectItem value="10">10</SelectItem>
+                        <SelectItem value="20">20</SelectItem>
+                        <SelectItem value="50">50</SelectItem>
+                    </SelectContent>
+                </Select>
+
+                <div
+                    class="relative w-44 transition-[width] duration-200 ease-in-out hover:w-64 focus-within:w-64"
+                >
+                    <Search
+                        class="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground"
+                    />
+                    <Input
+                        v-model="search"
+                        type="search"
+                        placeholder="Search attendance"
+                        class="h-8 pl-8 text-sm"
+                    />
+                </div>
             </div>
         </div>
 
         <div class="overflow-hidden rounded-md border border-border bg-card">
-            <div class="overflow-x-auto">
+            <div
+                class="overflow-x-auto"
+                :class="visibleTableRowCount > 7 ? 'max-h-[30rem] overflow-y-auto' : ''"
+            >
                 <table class="w-full text-sm">
-                    <thead class="bg-muted/50 text-left text-muted-foreground">
+                    <thead class="sticky top-0 z-10 bg-muted text-left text-muted-foreground">
                         <tr>
+                            <th class="w-12 px-4 py-3"><span class="sr-only">Select attendance</span></th>
                             <th class="px-4 py-3 font-weight-bold">Name</th>
                             <th class="px-4 py-3 font-weight-bold">Date</th>
                             <th class="px-4 py-3 font-weight-bold">Check In</th>
@@ -467,6 +620,17 @@ const groupedAttendanceRecords = computed(() => {
                             :key="group.date"
                         >
                             <tr class="border-t border-border bg-muted/30">
+                                <td class="w-12 px-4 py-2">
+                                    <Checkbox
+                                        :id="`attendance-group-${group.date}`"
+                                        :model-value="groupSelectionState(group.records)"
+                                        :aria-label="`Select all attendance for ${formatDate(group.date)}`"
+                                        @update:model-value="
+                                            toggleGroupSelection(group.records, $event)
+                                        "
+                                    />
+                                </td>
+
                                 <td
                                     colspan="8"
                                     class="px-4 py-2 text-sm font-semibold"
@@ -480,6 +644,16 @@ const groupedAttendanceRecords = computed(() => {
                                 :key="record.id"
                                 class="border-t border-border"
                             >
+                                <td class="w-12 px-4 py-3">
+                                    <Checkbox
+                                        :id="`attendance-record-${record.id}`"
+                                        :model-value="isAttendanceSelected(record.id)"
+                                        :aria-label="`Select attendance record for ${formatUserName(record.user)}`"
+                                        @update:model-value="
+                                            toggleAttendanceSelection(record.id, $event)
+                                        "
+                                    />
+                                </td>
                                 <td class="px-4 py-3 font-medium">
                                     {{ formatUserName(record.user) }}
                                 </td>
@@ -600,7 +774,7 @@ const groupedAttendanceRecords = computed(() => {
 
                         <tr v-if="filteredAttendanceRecords.length === 0">
                             <td
-                                colspan="8"
+                                colspan="9"
                                 class="px-4 py-8 text-center text-muted-foreground"
                             >
                                 No attendance records found.
@@ -609,6 +783,43 @@ const groupedAttendanceRecords = computed(() => {
                     </tbody>
                 </table>
             </div>
+                <!-- pagination footer -->
+
+                <div
+                    class="flex flex-col gap-3 border-t border-border px-4 py-3 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between"
+                >
+                    <p>
+                        Showing {{ paginationStart }} to {{ paginationEnd }} of
+                        {{ filteredAttendanceRecords.length }} records
+                    </p>
+
+                    <div class="flex items-center justify-end gap-2">
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="icon-sm"
+                            :disabled="currentPage === 1"
+                            @click="goToPreviousPage"
+                        >
+                            <ChevronLeft class="size-4" />
+                        </Button>
+
+                        <span class="min-w-20 text-center">
+                            Page {{ currentPage }} of {{ totalPages }}
+                        </span>
+
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="icon-sm"
+                            :disabled="currentPage === totalPages"
+                            @click="goToNextPage"
+                        >
+                            <ChevronRight class="size-4" />
+                        </Button>
+                    </div>
+                </div>
+
         </div>
         <EditAttendance
             v-model:open="editDialogOpen"
