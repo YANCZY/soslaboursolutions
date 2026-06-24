@@ -4,6 +4,7 @@ use App\Http\Controllers\Settings\ProfileController;
 use App\Http\Controllers\Settings\SecurityController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Admin\Settings\UserSettingsController;
+use App\Http\Controllers\Admin\Settings\CompanySettingsController;
 
 
 
@@ -24,6 +25,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('user-password.update');
 
     Route::inertia('settings/appearance', 'settings/Appearance')->name('appearance.edit');
+   Route::get('settings/company', [CompanySettingsController::class, 'index'])
+    ->name('settings.company.index');
     Route::get('settings/users', [UserSettingsController::class, 'index'])
     ->name('settings.users.index');
     Route::post('settings/users', [UserSettingsController::class, 'store'])
