@@ -21,6 +21,10 @@ const sidebarNavItems: NavItem[] = [
         href: '/settings/appearance',
     },
     {
+        title: 'Company',
+        href: '/settings/company'
+    },
+    {
         title: 'Users',
         href: '/settings/users',
     },
