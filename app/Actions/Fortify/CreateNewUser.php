@@ -26,7 +26,7 @@ class CreateNewUser implements CreatesNewUsers
         ])->validate();
 
         $adminUserType = UserType::query()->firstOrCreate([
-            'user_type_name' => 'Admin',
+            'user_type_name' => 'Superadmin',
         ]);
 
         return User::create([

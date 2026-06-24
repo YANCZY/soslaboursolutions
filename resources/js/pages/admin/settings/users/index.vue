@@ -57,20 +57,31 @@ type Company = {
     company_name: string;
 };
 
+type UserType = {
+    id: number;
+    user_type_name: string;
+};
+
 
 const props = defineProps<{
     users: PaginatedUsers;
     companies: Company[];
+    userTypes: UserType[];
     filters: {
         search: string;
     };
 }>();
+
 
 const search = ref(props.filters.search ?? '');
 
 const companySearch = ref('');
 const companyLookupOpen = ref(false);
 const selectedCompanyId = ref<number | null>(null);
+
+const profileSearch = ref('');
+const profileLookupOpen = ref(false);
+const selectedUserTypeId = ref<number | null>(null);
 
 const addUserDialogOpen = ref(false);
 
@@ -80,6 +91,7 @@ const addUserForm = useForm({
     email: '',
     phone: '',
     client_id: null as number | null,
+    user_type_id: null as number | null,
 });
 
 
@@ -95,10 +107,34 @@ const filteredCompanies = computed(() => {
     );
 });
 
+const filteredUserTypes = computed(() => {
+    const value = profileSearch.value.trim().toLowerCase();
+
+    if (!value) {
+        return props.userTypes;
+    }
+
+    return props.userTypes.filter((userType) =>
+        userType.user_type_name.toLowerCase().includes(value),
+    );
+});
+
 const selectCompany = (company: Company) => {
     selectedCompanyId.value = company.id;
     companySearch.value = company.company_name;
     companyLookupOpen.value = false;
+};
+
+const selectUserType = (userType: UserType) => {
+    selectedUserTypeId.value = userType.id;
+    profileSearch.value = userType.user_type_name;
+    profileLookupOpen.value = false;
+};
+
+const closeProfileLookup = () => {
+    window.setTimeout(() => {
+        profileLookupOpen.value = false;
+    }, 100);
 };
 
 const closeCompanyLookup = () => {
@@ -109,6 +145,7 @@ const closeCompanyLookup = () => {
 
 const saveUser = () => {
     addUserForm.client_id = selectedCompanyId.value;
+    addUserForm.user_type_id = selectedUserTypeId.value;
 
     addUserForm.post('/settings/users/', {
         preserveScroll: true,
@@ -117,6 +154,8 @@ const saveUser = () => {
             addUserForm.reset();
             companySearch.value = '';
             selectedCompanyId.value = null;
+            profileSearch.value = '';
+            selectedUserTypeId.value = null;
             toast.success('User has been added. Account setup email will be sent shortly.');
         },
 
@@ -257,6 +296,48 @@ defineOptions({
                         <Label for="phone">Phone</Label>
                         <Input id="phone"  v-model="addUserForm.phone" placeholder="Phone number" />
                         <InputError :message="addUserForm.errors.phone" />
+                    </div>
+
+
+                    <div class="grid gap-2 sm:col-span-2">
+                        <Label for="profile">Profile</Label>
+
+                        <div class="relative">
+                            <Input
+                                id="profile"
+                                v-model="profileSearch"
+                                type="search"
+                                placeholder="Search profile..."
+                                autocomplete="off"
+                                @focus="profileLookupOpen = true"
+                                @blur="closeProfileLookup"
+                                @keydown.escape="profileLookupOpen = false"
+                            />
+
+                            <InputError :message="addUserForm.errors.user_type_id" />
+
+                            <div
+                                v-if="profileLookupOpen"
+                                class="absolute z-50 mt-1 max-h-56 w-full overflow-y-auto rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
+                            >
+                                <button
+                                    v-for="userType in filteredUserTypes"
+                                    :key="userType.id"
+                                    type="button"
+                                    class="flex w-full items-center rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent hover:text-accent-foreground"
+                                    @mousedown.prevent="selectUserType(userType)"
+                                >
+                                    {{ userType.user_type_name }}
+                                </button>
+
+                                <div
+                                    v-if="filteredUserTypes.length === 0"
+                                    class="px-2 py-2 text-sm text-muted-foreground"
+                                >
+                                    No profiles found.
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
                    <div class="grid gap-2 sm:col-span-2">

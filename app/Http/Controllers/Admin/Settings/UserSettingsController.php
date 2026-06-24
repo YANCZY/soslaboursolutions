@@ -12,6 +12,7 @@ use Illuminate\Http\Request;
 use App\Models\Client;
 use App\Models\UserType;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 
 
 
@@ -23,8 +24,8 @@ class UserSettingsController extends Controller
 
         return Inertia::render('admin/settings/users/index', [
            'users' => User::query()
-            ->with('client:id,company_name')
-            ->select('id', 'first_name', 'last_name', 'email', 'status', 'phone', 'mobile', 'client_id')
+            ->with(['client:id,company_name', 'userType:id,user_type_name'])
+            ->select('id', 'first_name', 'last_name', 'email', 'status', 'phone', 'mobile', 'client_id', 'user_type_id')
             ->when($search !== '', function ($query) use ($search) {
                 $normalizedSearch = mb_strtolower($search);
                 $searchValue = '%' . $normalizedSearch . '%';
@@ -58,6 +59,12 @@ class UserSettingsController extends Controller
             ->orderBy('company_name', 'asc')
             ->get(),
 
+            'userTypes' => UserType::query()
+            ->select('id', 'user_type_name')
+            ->where('user_type_name', '!=', 'Superadmin')
+            ->orderBy('id')
+            ->get(),
+
         ]);
     }
 
@@ -79,11 +86,9 @@ class UserSettingsController extends Controller
             'phone' => 'nullable|string|max:20',
             'mobile' => 'nullable|string|max:20',
             'client_id' => 'nullable|exists:clients,id',
+            'user_type_id' => 'required|exists:user_types,id',
         ]);
 
-           $adminUserType = UserType::query()->firstOrCreate([
-                'user_type_name' => 'Admin',
-            ]);
 
         // User::create($validated + ['status' => 'active']);
        $user = User::create([
@@ -91,7 +96,10 @@ class UserSettingsController extends Controller
                 'mobile' => $validated['mobile'] ?? null,
                 'status' => 'pending',
                 'password'=> Hash::make(Str::random(32)),
-                'user_type_id' => $adminUserType->id,
+                'user_type_id' => [
+                    'required',
+                    Rule::exists('user_types', 'id')->where(fn ($query) => $query->where('user_type_name', '!=', 'Superadmin')),
+                ],
             ]);
 
         SendAccountAccessLink::dispatch($user->id);
