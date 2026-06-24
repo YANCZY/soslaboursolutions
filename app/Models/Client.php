@@ -21,6 +21,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
     'company_address_city',
     'company_address_state',
     'company_address_country',
+
 ])]
 class Client extends Model
 {

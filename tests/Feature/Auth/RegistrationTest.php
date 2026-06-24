@@ -32,7 +32,7 @@ class RegistrationTest extends TestCase
         $response->assertRedirect(route('dashboard', absolute: false));
 
         $user = User::query()->where('email', 'test@example.com')->first();
-        $adminUserType = UserType::query()->where('user_type_name', 'Admin')->first();
+        $adminUserType = UserType::query()->where('user_type_name', 'Superadmin')->first();
 
         $this->assertNotNull($user);
         $this->assertNotNull($adminUserType);
