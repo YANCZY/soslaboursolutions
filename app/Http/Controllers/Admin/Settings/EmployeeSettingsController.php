@@ -19,11 +19,18 @@ class EmployeeSettingsController extends Controller
     {
         $search = trim((string) $request->query('search', ''));
 
+        $status = $request->query('status', 'active');
+
+        if (! in_array($status, ['active', 'inactive', 'all'], true)) {
+            $status = 'active';
+        }
+
         return Inertia::render('admin/settings/employee/index', [
             'employees' => User::query()
                 ->with('userType:id,user_type_name')
                 ->select('id', 'first_name', 'last_name', 'email', 'status', 'phone', 'mobile', 'client_id', 'user_type_id')
                 ->where('client_id', $request->user()->client_id)
+                ->when($status !== 'all', fn($query) => $query->where('status', $status))
                 ->when($search !== '', function ($query) use ($search) {
                     $searchValue = '%'.mb_strtolower($search).'%';
 
@@ -44,6 +51,7 @@ class EmployeeSettingsController extends Controller
 
             'filters' => [
                 'search' => $search,
+                'status' => $status,
             ],
 
             'userTypes' => UserType::query()

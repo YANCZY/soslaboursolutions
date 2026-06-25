@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Head, Link, router, useForm  } from '@inertiajs/vue3';
-import { Plus, Search, User } from 'lucide-vue-next';
+import { Filter, Plus, Search, User } from 'lucide-vue-next';
 import { computed, ref, watch } from 'vue';
 import { toast } from 'vue-sonner';
 import Heading from '@/components/Heading.vue';
@@ -16,6 +16,12 @@ import {
     DialogTitle,
     DialogTrigger,
 } from '@/components/ui/dialog';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import SettingsLayout from '@/layouts/settings/Layout.vue';
@@ -63,11 +69,43 @@ const props = defineProps<{
     userTypes: UserType[];
     filters: {
         search: string;
+        status: 'active' | 'inactive' | 'all';
     };
 }>();
 
-
 const search = ref(props.filters.search ?? '');
+
+type StatusFilter = 'active' | 'inactive' | 'all';
+
+const statusFilter = ref<StatusFilter>(props.filters.status ?? 'active');
+
+const statusFilterLabel = computed(() => {
+    if (statusFilter.value === 'all') {
+        return 'All';
+    }
+
+    return statusLabel(statusFilter.value);
+});
+
+const applyFilters = () => {
+    router.get(
+        '/settings/employee',
+        {
+            search: search.value || undefined,
+            status: statusFilter.value === 'active' ? undefined : statusFilter.value,
+        },
+        {
+            preserveState: true,
+            preserveScroll: true,
+            replace: true,
+        },
+    );
+};
+
+const changeStatusFilter = (status: StatusFilter) => {
+    statusFilter.value = status;
+    applyFilters();
+};
 
 const profileSearch = ref('');
 const profileLookupOpen = ref(false);
@@ -130,17 +168,7 @@ const saveUser = () => {
 watch(search, (value, _oldValue, onCleanup) => {
 
     const searchDelay = window.setTimeout(() => {
-        router.get(
-           '/settings/employee',
-            {
-                search: value || undefined,
-            },
-            {
-                preserveState: true,
-                preserveScroll: true,
-                replace: true,
-            },
-        );
+        applyFilters();
     },500);
 
     onCleanup(() => window.clearTimeout(searchDelay));
@@ -215,374 +243,293 @@ defineOptions({
                 title="Employee"
                 description="Manage employees for this company"
             />
-<!-- SEARCH -->
-            <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
-            <Dialog v-model:open="addUserDialogOpen">
-    <DialogTrigger as-child>
-        <Button
-            type="button"
-            class="h-8 gap-2  text-white hover:bg-red-700"
-        >
-            <Plus class="size-4" />
-            Add employee
-                </Button>
-            </DialogTrigger>
-            <DialogContent class="sm:max-w-lg">
-                <DialogHeader>
-                    <DialogTitle>Add user</DialogTitle>
-                    <DialogDescription>
-                        Create a user profile for workspace access.
-                    </DialogDescription>
-                </DialogHeader>
 
-                <div class="grid gap-4 py-2 sm:grid-cols-2">
-                    <div class="grid gap-2">
-                        <Label for="first_name">First name</Label>
-                        <Input id="first_name"  v-model="addUserForm.first_name"  placeholder="First name" />
-                        <InputError :message="addUserForm.errors.first_name" />
-                    </div>
-
-                    <div class="grid gap-2">
-                        <Label for="last_name">Last name</Label>
-                        <Input id="last_name"  v-model="addUserForm.last_name" placeholder="Last name" />
-                        <InputError :message="addUserForm.errors.last_name" />
-                    </div>
-
-                    <div class="grid gap-2">
-                        <Label for="email">Email</Label>
-                        <Input id="email" type="email"  v-model="addUserForm.email" placeholder="email@example.com" />
-                        <InputError :message="addUserForm.errors.email" />
-                    </div>
-
-                    <div class="grid gap-2">
-                        <Label for="phone">Phone</Label>
-                        <Input id="phone"  v-model="addUserForm.phone" placeholder="Phone number" />
-                        <InputError :message="addUserForm.errors.phone" />
-                    </div>
-
-
-                    <div class="grid gap-2 sm:col-span-2">
-                        <Label for="profile">Profile</Label>
-
-                        <div class="relative">
-                            <Input
-                                id="profile"
-                                v-model="profileSearch"
-                                type="search"
-                                placeholder="Search profile..."
-                                autocomplete="off"
-                                @focus="profileLookupOpen = true"
-                                @blur="closeProfileLookup"
-                                @keydown.escape="profileLookupOpen = false"
-                            />
-
-                            <InputError :message="addUserForm.errors.user_type_id" />
-
-                            <div
-                                v-if="profileLookupOpen"
-                                class="absolute z-50 mt-1 max-h-56 w-full overflow-y-auto rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
-                            >
-                                <button
-                                    v-for="userType in filteredUserTypes"
-                                    :key="userType.id"
-                                    type="button"
-                                    class="flex w-full items-center rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent hover:text-accent-foreground"
-                                    @mousedown.prevent="selectUserType(userType)"
-                                >
-                                    {{ userType.user_type_name }}
-                                </button>
-
-                                <div
-                                    v-if="filteredUserTypes.length === 0"
-                                    class="px-2 py-2 text-sm text-muted-foreground"
-                                >
-                                    No profiles found.
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                   <div class="grid gap-2 sm:col-span-2">
-                        <Label for="company">Company</Label>
-
-                        <div class="relative">
-                            <Input
-                                id="company"
-                                v-model="companySearch"
-                                type="search"
-                                placeholder="Search company..."
-                                autocomplete="off"
-                                @focus="companyLookupOpen = true"
-                                 @blur="closeCompanyLookup"
-                                @keydown.escape="companyLookupOpen = false"
-                            />
-                            <InputError :message="addUserForm.errors.client_id" />
-
-                            <div
-                                v-if="companyLookupOpen"
-                                class="absolute z-50 mt-1 max-h-56 w-full overflow-y-auto rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
-                            >
-                                <button
-                                    v-for="company in filteredCompanies"
-                                    :key="company.id"
-                                    type="button"
-                                    class="flex w-full items-center rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent hover:text-accent-foreground"
-                                    @mousedown.prevent="selectCompany(company)"
-                                >
-                                    {{ company.company_name }}
-                                </button>
-
-                                <div
-                                    v-if="filteredCompanies.length === 0"
-                                    class="px-2 py-2 text-sm text-muted-foreground"
-                                >
-                                    No companies found.
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-
-                </div>
-
-                <DialogFooter>
-                    <DialogClose as-child>
-                        <Button type="button" variant="secondary">
-                            Cancel
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <Dialog v-model:open="addUserDialogOpen">
+                    <DialogTrigger as-child>
+                        <Button type="button" class="h-8 gap-2 text-white hover:bg-red-700">
+                            <Plus class="size-4" />
+                            Add employee
                         </Button>
-                    </DialogClose>
+                    </DialogTrigger>
 
-                    <Button
-                        type="button"
-                        class="bg-red-600 text-white"
-                        :disabled="addUserForm.processing"
-                        @click="saveUser"
-                    >
-                        Save user
-                    </Button>
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
+                    <DialogContent class="sm:max-w-lg">
+                        <DialogHeader>
+                            <DialogTitle>Add employee</DialogTitle>
+                            <DialogDescription>
+                                Create an employee profile for workspace access.
+                            </DialogDescription>
+                        </DialogHeader>
 
+                        <div class="grid gap-4 py-2 sm:grid-cols-2">
+                            <div class="grid gap-2">
+                                <Label for="first_name">First name</Label>
+                                <Input id="first_name" v-model="addUserForm.first_name" placeholder="First name" />
+                                <InputError :message="addUserForm.errors.first_name" />
+                            </div>
 
-            <div
-                class="relative w-40 transition-[width] duration-200 ease-in-out hover:w-64 focus-within:w-64"
-            >
-                <Search
-                    class="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground"
-                />
-                <Input
-                    v-model="search"
-                    type="search"
-                    placeholder="Search users..."
-                    class="h-8 pl-8 text-sm"
-                />
+                            <div class="grid gap-2">
+                                <Label for="last_name">Last name</Label>
+                                <Input id="last_name" v-model="addUserForm.last_name" placeholder="Last name" />
+                                <InputError :message="addUserForm.errors.last_name" />
+                            </div>
+
+                            <div class="grid gap-2">
+                                <Label for="email">Email</Label>
+                                <Input id="email" v-model="addUserForm.email" type="email"
+                                    placeholder="email@example.com" />
+                                <InputError :message="addUserForm.errors.email" />
+                            </div>
+
+                            <div class="grid gap-2">
+                                <Label for="phone">Phone</Label>
+                                <Input id="phone" v-model="addUserForm.phone" placeholder="Phone number" />
+                                <InputError :message="addUserForm.errors.phone" />
+                            </div>
+
+                            <div class="grid gap-2 sm:col-span-2">
+                                <Label for="profile">Profile</Label>
+
+                                <div class="relative">
+                                    <Input id="profile" v-model="profileSearch" type="search"
+                                        placeholder="Search profile..." autocomplete="off"
+                                        @focus="profileLookupOpen = true" @blur="closeProfileLookup"
+                                        @keydown.escape="profileLookupOpen = false" />
+
+                                    <InputError :message="addUserForm.errors.user_type_id" />
+
+                                    <div v-if="profileLookupOpen"
+                                        class="absolute z-50 mt-1 max-h-56 w-full overflow-y-auto rounded-md border bg-popover p-1 text-popover-foreground shadow-md">
+                                        <button v-for="userType in filteredUserTypes" :key="userType.id" type="button"
+                                            class="flex w-full items-center rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent hover:text-accent-foreground"
+                                            @mousedown.prevent="selectUserType(userType)">
+                                            {{ userType.user_type_name }}
+                                        </button>
+
+                                        <div v-if="filteredUserTypes.length === 0"
+                                            class="px-2 py-2 text-sm text-muted-foreground">
+                                            No profiles found.
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <DialogFooter>
+                            <DialogClose as-child>
+                                <Button type="button" variant="secondary">
+                                    Cancel
+                                </Button>
+                            </DialogClose>
+
+                            <Button type="button" class="bg-red-600 text-white" :disabled="addUserForm.processing"
+                                @click="saveUser">
+                                Save employee
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
+
+                <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
+                    <div class="relative w-40 transition-[width] duration-200 ease-in-out hover:w-64 focus-within:w-64">
+                        <Search
+                            class="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
+                        <Input v-model="search" type="search" placeholder="Search employees..."
+                            class="h-8 pl-8 text-sm" />
+                    </div>
+
+                    <DropdownMenu>
+                        <DropdownMenuTrigger as-child>
+                            <Button type="button" variant="outline" class="h-8 gap-2" title="Filter employees"
+                                aria-label="Filter employees">
+                                <Filter class="size-4" />
+                                {{ statusFilterLabel }}
+                            </Button>
+                        </DropdownMenuTrigger>
+
+                        <DropdownMenuContent align="end">
+                            <DropdownMenuItem @click="changeStatusFilter('active')">
+                                Active
+                            </DropdownMenuItem>
+                            <DropdownMenuItem @click="changeStatusFilter('all')">
+                                All
+                            </DropdownMenuItem>
+                            <DropdownMenuItem @click="changeStatusFilter('inactive')">
+                                Inactive
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                </div>
             </div>
-        </div>
-
-
 
             <div class="w-full max-w-7xl overflow-hidden rounded-md border">
+                <div class="hidden overflow-x-auto md:block">
+                    <table class="w-full min-w-[68rem] table-fixed text-sm">
+                        <thead class="bg-muted text-left">
+                            <tr>
+                                <th class="w-[13%] px-4 py-3 font-medium">
+                                    First name
+                                </th>
+                                <th class="w-[13%] px-4 py-3 font-medium">
+                                    Last name
+                                </th>
+                                <th class="w-[21%] px-4 py-3 font-medium">
+                                    Company
+                                </th>
+                                <th class="w-[21%] px-4 py-3 font-medium">
+                                    Email
+                                </th>
+                                <th class="w-[10%] px-4 py-3 font-medium">
+                                    Status
+                                </th>
+                                <th class="w-[8%] px-4 py-3 font-medium">
+                                    Phone
+                                </th>
+                                <th class="w-[8%] px-4 py-3 font-medium">
+                                    Mobile
+                                </th>
+                                <th class="w-[8%] px-4 py-3 text-center font-medium">
+                                    Action
+                                </th>
+                            </tr>
+                        </thead>
 
-            <div class="hidden overflow-x-auto md:block">
-                <table class="w-full min-w-[68rem] table-fixed text-sm">
-                    <thead class="bg-muted text-left">
-                        <tr>
-                            <th class="w-[13%] px-4 py-3 font-medium">
-                                First name
-                            </th>
-                            <th class="w-[13%] px-4 py-3 font-medium">
-                                Last name
-                            </th>
-                            <th class="w-[21%] px-4 py-3 font-medium">
-                                Company
-                            </th>
-                            <th class="w-[21%] px-4 py-3 font-medium">Email</th>
-                            <th class="w-[10%] px-4 py-3 font-medium">
-                                Status
-                            </th>
-                            <th class="w-[8%] px-4 py-3 font-medium">Phone</th>
-                            <th class="w-[8%] px-4 py-3 font-medium">Mobile</th>
-                            <th
-                                class="w-[8%] px-4 py-3 text-center font-medium"
-                            >
-                                Action
-                            </th>
-                        </tr>
-                    </thead>
-
-                    <tbody>
-                        <tr
-                            v-for="user in employees.data"
-                            :key="user.id"
-                            class="border-t"
-                        >
-                            <td class="truncate px-4 py-3">
-                                {{ user.first_name }}
-                            </td>
-                            <td class="truncate px-4 py-3">
-                                {{ user.last_name }}
-                            </td>
-                            <td class="truncate px-4 py-3">
-                                {{ user.client?.company_name ?? '-' }}
-                            </td>
-                            <td class="truncate px-4 py-3">
-                                {{ user.email }}
-                            </td>
-                            <td class="px-4 py-3">
-                                <span
-                                    class="inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium"
-                                    :class="statusBadgeClass(user.status)"
-                                >
-                                    {{ statusLabel(user.status) }}
-                                </span>
-                            </td>
-                            <td class="truncate px-4 py-3">
-                                {{ user.phone ?? '-' }}
-                            </td>
-                            <td class="truncate px-4 py-3">
-                                {{ user.mobile ?? '-' }}
-                            </td>
-                            <td class="px-4 py-3 text-center">
-                               <button
-                                    type="button"
-                                    class="inline-flex size-8 items-center justify-center rounded-md border transition-all"
-                                    :class="
-                                        user.status === 'active'
+                        <tbody>
+                            <tr v-for="user in employees.data" :key="user.id" class="border-t">
+                                <td class="truncate px-4 py-3">
+                                    {{ user.first_name }}
+                                </td>
+                                <td class="truncate px-4 py-3">
+                                    {{ user.last_name }}
+                                </td>
+                                <td class="truncate px-4 py-3">
+                                    {{ user.client?.company_name ?? '-' }}
+                                </td>
+                                <td class="truncate px-4 py-3">
+                                    {{ user.email }}
+                                </td>
+                                <td class="px-4 py-3">
+                                    <span
+                                        class="inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium"
+                                        :class="statusBadgeClass(user.status)">
+                                        {{ statusLabel(user.status) }}
+                                    </span>
+                                </td>
+                                <td class="truncate px-4 py-3">
+                                    {{ user.phone ?? '-' }}
+                                </td>
+                                <td class="truncate px-4 py-3">
+                                    {{ user.mobile ?? '-' }}
+                                </td>
+                                <td class="px-4 py-3 text-center">
+                                    <button type="button"
+                                        class="inline-flex size-8 items-center justify-center rounded-md border transition-all"
+                                        :class="user.status === 'active'
                                             ? 'border-border bg-muted text-foreground shadow-inner ring-1 ring-border'
                                             : 'border-border bg-background text-muted-foreground shadow-sm hover:bg-muted/60 hover:text-foreground'
-                                    "
-                                    :title="user.status === 'active' ? 'Deactivate user' : 'Activate user'"
-                                    :aria-label="user.status === 'active' ? 'Deactivate user' : 'Activate user'"
-                                    @click="toggleStatus(user)"
-                                >
-                                    <User class="size-4" />
-                                </button>
-                            </td>
-                        </tr>
-                        <!-- No users found -->
-                        <tr v-if="employees.data.length === 0">
-                            <td
-                                colspan="8"
-                                class="px-4 py-6 text-center text-muted-foreground"
-                            >
-                                No users found.
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
+    " :title="user.status === 'active' ? 'Deactivate user' : 'Activate user'"
+                                        :aria-label="user.status === 'active' ? 'Deactivate user' : 'Activate user'"
+                                        @click="toggleStatus(user)">
+                                        <User class="size-4" />
+                                    </button>
+                                </td>
+                            </tr>
 
-            <div class="divide-y md:hidden">
-                <article
-                    v-for="user in employees.data"
-                    :key="user.id"
-                    class="space-y-4 p-4"
-                >
-                    <div class="flex items-start justify-between gap-3">
-                        <div class="min-w-0">
-                            <h2 class="truncate text-sm font-medium">
-                                {{ user.first_name }} {{ user.last_name }}
-                            </h2>
-                            <p
-                                class="text-sm break-words text-muted-foreground"
-                            >
-                                {{ user.email }}
-                            </p>
-                        </div>
+                            <tr v-if="employees.data.length === 0">
+                                <td colspan="8" class="px-4 py-6 text-center text-muted-foreground">
+                                    No employees found.
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
 
-                        <div class="flex shrink-0 items-center gap-2">
-                            <span
-                                class="rounded-full border px-2.5 py-1 text-xs font-medium"
-                                :class="statusBadgeClass(user.status)"
-                            >
-                                {{ statusLabel(user.status) }}
-                            </span>
+                <div class="divide-y md:hidden">
+                    <article v-for="user in employees.data" :key="user.id" class="space-y-4 p-4">
+                        <div class="flex items-start justify-between gap-3">
+                            <div class="min-w-0">
+                                <h2 class="truncate text-sm font-medium">
+                                    {{ user.first_name }} {{ user.last_name }}
+                                </h2>
+                                <p class="text-sm break-words text-muted-foreground">
+                                    {{ user.email }}
+                                </p>
+                            </div>
 
-                            <button
-                                type="button"
-                                class="inline-flex size-8 items-center justify-center rounded-md border transition-all"
-                                :class="
-                                    user.status === 'active'
+                            <div class="flex shrink-0 items-center gap-2">
+                                <span class="rounded-full border px-2.5 py-1 text-xs font-medium"
+                                    :class="statusBadgeClass(user.status)">
+                                    {{ statusLabel(user.status) }}
+                                </span>
+
+                                <button type="button"
+                                    class="inline-flex size-8 items-center justify-center rounded-md border transition-all"
+                                    :class="user.status === 'active'
                                         ? 'border-border bg-muted text-foreground shadow-inner ring-1 ring-border'
                                         : 'border-border bg-background text-muted-foreground shadow-sm hover:bg-muted/60 hover:text-foreground'
-                                "
-                                :title="user.status === 'active' ? 'Deactivate user' : 'Activate user'"
-                                :aria-label="user.status === 'active' ? 'Deactivate user' : 'Activate user'"
-                                @click="toggleStatus(user)"
-                            >
-                                <User class="size-4" />
-                            </button>
-                        </div>
-                    </div>
-                    <dl class="grid grid-cols-1 gap-3 text-sm">
-                        <div>
-                            <dt
-                                class="text-xs font-medium text-muted-foreground"
-                            >
-                                Company
-                            </dt>
-                            <dd class="mt-1">
-                                {{ user.client?.company_name ?? '-' }}
-                            </dd>
-                        </div>
-                        <div>
-                            <dt
-                                class="text-xs font-medium text-muted-foreground"
-                            >
-                                Phone
-                            </dt>
-                            <dd class="mt-1">{{ user.phone ?? '-' }}</dd>
+    " :title="user.status === 'active' ? 'Deactivate user' : 'Activate user'"
+                                    :aria-label="user.status === 'active' ? 'Deactivate user' : 'Activate user'"
+                                    @click="toggleStatus(user)">
+                                    <User class="size-4" />
+                                </button>
+                            </div>
                         </div>
 
-                        <div>
-                            <dt
-                                class="text-xs font-medium text-muted-foreground"
-                            >
-                                Mobile
-                            </dt>
-                            <dd class="mt-1">{{ user.mobile ?? '-' }}</dd>
-                        </div>
-                    </dl>
-                </article>
+                        <dl class="grid grid-cols-1 gap-3 text-sm">
+                            <div>
+                                <dt class="text-xs font-medium text-muted-foreground">
+                                    Company
+                                </dt>
+                                <dd class="mt-1">
+                                    {{ user.client?.company_name ?? '-' }}
+                                </dd>
+                            </div>
 
-                <div
-                    v-if="employees.data.length === 0"
-                    class="px-4 py-6 text-center text-sm text-muted-foreground"
-                >
-                    No users found.
-                </div>
-            </div>
+                            <div>
+                                <dt class="text-xs font-medium text-muted-foreground">
+                                    Phone
+                                </dt>
+                                <dd class="mt-1">
+                                    {{ user.phone ?? '-' }}
+                                </dd>
+                            </div>
 
-            <!-- Pagination -->
-            <div class="border-t px-4 py-3">
-                <div
-                    class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
-                >
-                    <p class="text-sm text-muted-foreground">
-                        Showing {{ employees.from }} to {{ employees.to }} of
-                        {{ employees.total }} employees
-                    </p>
+                            <div>
+                                <dt class="text-xs font-medium text-muted-foreground">
+                                    Mobile
+                                </dt>
+                                <dd class="mt-1">
+                                    {{ user.mobile ?? '-' }}
+                                </dd>
+                            </div>
+                        </dl>
+                    </article>
 
-                    <div class="flex flex-wrap items-center gap-2">
-                        <Link
-                            v-for="link in employees.links"
-                            :key="link.label"
-                            :href="link.url ?? '#'"
-                            preserve-scroll
-                            class="inline-flex h-9 min-w-9 items-center justify-center rounded-md border px-3 text-sm"
-                            :class="{
-                                'bg-primary text-primary-foreground':
-                                    link.active,
-                                'pointer-events-none opacity-50': !link.url,
-                            }"
-                        >
-                            {{ paginationLabel(link.label) }}
-                        </Link>
+                    <div v-if="employees.data.length === 0" class="px-4 py-6 text-center text-sm text-muted-foreground">
+                        No employees found.
                     </div>
                 </div>
-            </div>
-            <!-- End Pagination -->
+
+                <div class="border-t px-4 py-3">
+                    <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <p class="text-sm text-muted-foreground">
+                            Showing {{ employees.from }} to {{ employees.to }} of
+                            {{ employees.total }} employees
+                        </p>
+
+                        <div class="flex flex-wrap items-center gap-2">
+                            <Link v-for="link in employees.links" :key="link.label" :href="link.url ?? '#'"
+                                preserve-scroll
+                                class="inline-flex h-9 min-w-9 items-center justify-center rounded-md border px-3 text-sm"
+                                :class="{
+    'bg-primary text-primary-foreground': link.active,
+    'pointer-events-none opacity-50': !link.url,
+}">
+                                {{ paginationLabel(link.label) }}
+                            </Link>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </SettingsLayout>

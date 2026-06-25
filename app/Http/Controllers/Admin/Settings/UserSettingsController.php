@@ -22,10 +22,17 @@ class UserSettingsController extends Controller
     {
         $search = trim((string) $request->query('search', ''));
 
+        $status = $request->query('status', 'active');
+
+        if (! in_array($status, ['active', 'inactive', 'all'], true)) {
+            $status = 'active';
+        }
+
         return Inertia::render('admin/settings/users/index', [
            'users' => User::query()
             ->with(['client:id,company_name', 'userType:id,user_type_name'])
             ->select('id', 'first_name', 'last_name', 'email', 'status', 'phone', 'mobile', 'client_id', 'user_type_id')
+                ->when($status !== 'all', fn($query) => $query->where('status', $status))
             ->when($search !== '', function ($query) use ($search) {
                 $normalizedSearch = mb_strtolower($search);
                 $searchValue = '%' . $normalizedSearch . '%';
@@ -53,6 +60,7 @@ class UserSettingsController extends Controller
 
             'filters' => [
                 'search' => $search,
+                'status' => $status,
             ],
             'companies' => Client::query()
             ->select('id', 'company_name')
