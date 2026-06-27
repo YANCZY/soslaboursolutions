@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Link, useForm } from '@inertiajs/vue3';
 import { X } from 'lucide-vue-next';
+import { computed, ref, watch } from 'vue';
 import InputError from '@/components/InputError.vue';
 import { Button } from '@/components/ui/button';
 import {
@@ -34,18 +35,52 @@ type ProfileDetails = {
     end_shift?: string | null;
 };
 
+type Company = {
+    id: number;
+    company_name: string;
+};
+
+type WorkDetail = {
+    client_id: number;
+    job_role?: string | null;
+    salary?: string | number | null;
+    travel_allowance?: string | number | null;
+    travel_allowance_currency?: string | null;
+    start_shift?: string | null;
+    end_shift?: string | null;
+};
+
 const props = defineProps<{
     open: boolean;
     user: UserProfile;
     profile: ProfileDetails;
+    companies: Company[];
     mustVerifyEmail: boolean;
     status?: string;
+    workDetails: WorkDetail[];
+    selectedCompanyId?: number | null;
 }>();
 
 const emit = defineEmits<{
     (e: 'update:open', open: boolean): void;
     (e: 'saved'): void;
 }>();
+
+const selectedCompanyId = props.selectedCompanyId ?? props.companies[0]?.id ?? null;
+
+const selectedCompany = props.companies.find(
+    (company) => company.id === selectedCompanyId,
+);
+
+const selectedCompanyLabel = ref(selectedCompany?.company_name ?? '');
+const companySearch = ref(selectedCompanyLabel.value);
+const companyLookupOpen = ref(false);
+
+const closeCompanyLookup = () => {
+    window.setTimeout(() => {
+        companyLookupOpen.value = false;
+    }, 100);
+};
 
 
 const form = useForm({
@@ -54,6 +89,7 @@ const form = useForm({
     email: props.user.email ?? '',
     phone: props.user.phone ?? '',
     mobile: props.user.mobile ?? '',
+    client_id: selectedCompanyId,
     job_role: props.profile.job_role ?? '',
     travel_allowance:
         props.profile.travel_allowance !== null &&
@@ -70,6 +106,42 @@ const form = useForm({
     end_shift: props.profile.end_shift ?? '',
 });
 
+const filteredCompanies = computed(() => {
+    if (props.companies.length <= 1) {
+        return [];
+    }
+
+    const value = companySearch.value.trim().toLowerCase();
+    const selectedValue = selectedCompanyLabel.value.trim().toLowerCase();
+
+    const searchValue =
+        form.client_id && value === selectedValue ? '' : value;
+
+    return props.companies.filter((company) => {
+        const isCurrentSelection = company.id === form.client_id;
+        const matchesSearch =
+            !searchValue ||
+            company.company_name.toLowerCase().includes(searchValue);
+
+        return matchesSearch && !isCurrentSelection;
+    });
+});
+
+watch(companySearch, (value) => {
+    if (value.trim() === '') {
+        form.client_id = null;
+        selectedCompanyLabel.value = '';
+        companyLookupOpen.value = props.companies.length > 1;
+    }
+});
+
+const selectCompany = (company: Company) => {
+    form.client_id = company.id;
+    selectedCompanyLabel.value = company.company_name;
+    companySearch.value = company.company_name;
+    companyLookupOpen.value = false;
+};
+
 function submit() {
     form.patch('/settings/profile', {
         preserveScroll: true,
@@ -79,6 +151,8 @@ function submit() {
         },
     });
 }
+
+
 </script>
 
 <template>
@@ -142,8 +216,31 @@ function submit() {
 
                     <section class="space-y-4 pt-2">
                         <div class="flex items-center gap-4">
-                            <h3 class="shrink-0 text-base font-semibold">Compensation</h3>
+                            <h3 class="shrink-0 text-base font-semibold">Work details</h3>
                             <div class="h-px flex-1 bg-border"></div>
+                        </div>
+
+                        <div class="space-y-2 md:col-span-2">
+                            <Label for="company">Company</Label>
+
+                            <div class="relative">
+                                <Input id="company" v-model="companySearch" type="search"
+                                    placeholder="Search company..." autocomplete="off"
+                                    @focus="companyLookupOpen = props.companies.length > 1"
+                                    @input="companyLookupOpen = props.companies.length > 1" @blur="closeCompanyLookup"
+                                    @keydown.escape="companyLookupOpen = false" />
+
+                                <InputError :message="form.errors.client_id" />
+
+                                <div v-if="companyLookupOpen && filteredCompanies.length > 0"
+                                    class="absolute z-50 mt-1 max-h-56 w-full overflow-y-auto rounded-md border bg-popover p-1 text-popover-foreground shadow-md">
+                                    <button v-for="company in filteredCompanies" :key="company.id" type="button"
+                                        class="flex w-full items-center rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent hover:text-accent-foreground"
+                                        @mousedown.prevent="selectCompany(company)">
+                                        {{ company.company_name }}
+                                    </button>
+                                </div>
+                            </div>
                         </div>
 
                         <div class="grid gap-6 md:grid-cols-2">
@@ -195,6 +292,11 @@ function submit() {
                                     placeholder="AUD"
                                 />
                                 <InputError :message="form.errors.travel_allowance_currency" />
+                            </div>
+                            <div class="space-y-2">
+                                <Label for="job_role">Job role</Label>
+                                <Input id="job_role" v-model="form.job_role" name="job_role" placeholder="Job role" />
+                                <InputError :message="form.errors.job_role" />
                             </div>
                         </div>
                     </section>

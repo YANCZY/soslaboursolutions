@@ -22,10 +22,30 @@ class ProfileController extends Controller
     {
         $profile = $request->user()->profile()->firstOrCreate([]);
 
+        $companies = $request->user()
+            ->clients()
+            ->select('clients.id', 'clients.company_name')
+            ->orderBy('company_name')
+            ->get();
+
+        $selectedCompanyId = $request->integer('client_id') ?: $companies->first()?->id;
+
+        $workDetail = $selectedCompanyId
+            ? $request->user()
+            ->companyWorkDetails()
+            ->with('client:id,company_name')
+            ->where('client_id', $selectedCompanyId)
+            ->first()
+            : null;
+
         return Inertia::render('settings/Profile', [
             'mustVerifyEmail' => $request->user() instanceof MustVerifyEmail,
             'status' => $request->session()->get('status'),
             'profile' => $profile,
+            'companies' => $companies,
+            'workDetail' => $workDetail,
+            'workDetails' => $request->user()->companyWorkDetails()->get(),
+            'selectedCompanyId' => $selectedCompanyId,
         ]);
     }
 
@@ -51,18 +71,23 @@ class ProfileController extends Controller
 
         $request->user()->save();
 
-        $request->user()->profile()->updateOrCreate([], Arr::only($validated, [
-            'job_role',
-            'travel_allowance',
-            'travel_allowance_currency',
-            'salary',
-            'start_shift',
-            'end_shift',
-        ]));
+        $request->user()->companyWorkDetails()->updateOrCreate(
+            ['client_id' => $validated['client_id']],
+            Arr::only($validated, [
+                'job_role',
+                'travel_allowance',
+                'travel_allowance_currency',
+                'salary',
+                'start_shift',
+                'end_shift',
+            ])
+        );
 
         Inertia::flash('toast', ['type' => 'success', 'message' => __('Profile updated.')]);
 
-        return to_route('profile.edit');
+        return to_route('profile.edit', [
+            'client_id' => $validated['client_id'],
+        ]);
     }
 
     /**

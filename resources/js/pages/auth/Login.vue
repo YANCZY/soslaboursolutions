@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Form, Head, router } from '@inertiajs/vue3';
+import { Info } from 'lucide-vue-next';
 import { onBeforeUnmount, onMounted } from 'vue';
 import InputError from '@/components/InputError.vue';
 import PasswordInput from '@/components/PasswordInput.vue';
@@ -62,9 +63,10 @@ onBeforeUnmount(() => {
 
     <div
         v-if="status"
-        class="mb-4 text-center text-sm font-medium text-red-600"
+        class="mb-4 flex items-center justify-center gap-2 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-medium text-blue-700"
     >
-        {{ status }}
+        <Info class="size-4" />
+        <span>{{ status }}</span>
     </div>
 
     <Form

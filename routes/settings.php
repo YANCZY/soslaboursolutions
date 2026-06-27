@@ -50,5 +50,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     ->name('settings.users.index');
     Route::post('settings/users', [UserSettingsController::class, 'store'])
     ->name('settings.users.store');
+    Route::patch('settings/users/{user}', [UserSettingsController::class, 'update'])
+        ->name('settings.users.update');
     Route::patch('settings/users/{user}/toggle-status',[UserSettingsController::class, 'toggleStatus'])->name('settings.users.toggle-status');
 });
