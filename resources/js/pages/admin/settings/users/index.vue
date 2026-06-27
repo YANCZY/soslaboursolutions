@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { Head, Link, router, useForm  } from '@inertiajs/vue3';
-import { Filter, Plus, Search, User } from 'lucide-vue-next';
+import { Filter, Pencil, Plus, Search, User } from 'lucide-vue-next';
 import { computed, ref, watch } from 'vue';
 import { toast } from 'vue-sonner';
 import Heading from '@/components/Heading.vue';
 import InputError from '@/components/InputError.vue';
 import { Button } from '@/components/ui/button';
+
 
 import {
     Dialog,
@@ -25,7 +26,14 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from '@/components/ui/tooltip';
 import SettingsLayout from '@/layouts/settings/Layout.vue';
+import EditUserForm from '@/views/settings/users/EditUserForm.vue';
 
 
 
@@ -34,13 +42,14 @@ type User = {
     first_name: string;
     last_name: string;
     email: string;
+    user_type_id: number;
     status: 'active' | 'inactive' | 'pending';
     phone: string | null;
     mobile: string | null;
-    client: {
+    clients: {
         id: number;
         company_name: string;
-    } | null;
+    }[];
 };
 
 type PaginationLink = {
@@ -76,13 +85,13 @@ const props = defineProps<{
     userTypes: UserType[];
     filters: {
         search: string;
-        status: 'active' | 'inactive' | 'all';
+        status: 'active' | 'inactive' | 'pending' | 'all';
     };
 }>();
 
 const search = ref(props.filters.search ?? '');
 
-type StatusFilter = 'active' | 'inactive' | 'all';
+type StatusFilter = 'active' | 'inactive' | 'pending' | 'all';
 
 const statusFilter = ref<StatusFilter>(props.filters.status ?? 'active');
 
@@ -117,7 +126,8 @@ const changeStatusFilter = (status: StatusFilter) => {
 
 const companySearch = ref('');
 const companyLookupOpen = ref(false);
-const selectedCompanyId = ref<number | null>(null);
+const companyVisibleLimit = ref(5);
+const selectedCompanyIds = ref<number[]>([]);
 
 const profileSearch = ref('');
 const profileLookupOpen = ref(false);
@@ -125,12 +135,20 @@ const selectedUserTypeId = ref<number | null>(null);
 
 const addUserDialogOpen = ref(false);
 
+const editUserDialogOpen = ref(false);
+const selectedUser = ref<User | null>(null);
+
+const openEditUser = (user: User) => {
+    selectedUser.value = user;
+    editUserDialogOpen.value = true;
+};
+
 const addUserForm = useForm({
     first_name: '',
     last_name: '',
     email: '',
     phone: '',
-    client_id: null as number | null,
+    client_ids: [] as number[],
     user_type_id: null as number | null,
 });
 
@@ -138,14 +156,23 @@ const addUserForm = useForm({
 const filteredCompanies = computed(() => {
     const value = companySearch.value.trim().toLowerCase();
 
-    if (!value) {
-        return props.companies;
-    }
+    return props.companies.filter((company) => {
+        const matchesSearch =
+            !value || company.company_name.toLowerCase().includes(value);
 
-    return props.companies.filter((company) =>
-        company.company_name.toLowerCase().includes(value),
-    );
+        const isAlreadySelected = selectedCompanyIds.value.includes(company.id);
+
+        return matchesSearch && !isAlreadySelected;
+    });
 });
+
+const visibleCompanies = computed(() =>
+    filteredCompanies.value.slice(0, companyVisibleLimit.value),
+);
+
+const hasMoreCompanies = computed(
+    () => companyVisibleLimit.value < filteredCompanies.value.length,
+);
 
 const filteredUserTypes = computed(() => {
     const value = profileSearch.value.trim().toLowerCase();
@@ -160,9 +187,45 @@ const filteredUserTypes = computed(() => {
 });
 
 const selectCompany = (company: Company) => {
-    selectedCompanyId.value = company.id;
-    companySearch.value = company.company_name;
-    companyLookupOpen.value = false;
+    if (selectedCompanyIds.value.includes(company.id)) {
+        return;
+    }
+
+    if (selectedCompanyIds.value.length >= 3) {
+        toast.error('You can select up to 3 companies only.');
+
+        return;
+    }
+
+    selectedCompanyIds.value.push(company.id);
+    companySearch.value = '';
+    companyLookupOpen.value = true;
+    companyVisibleLimit.value = 5;
+};
+
+const selectedCompanies = computed(() =>
+    props.companies.filter((company) =>
+        selectedCompanyIds.value.includes(company.id),
+    ),
+);
+
+const removeCompany = (companyId: number) => {
+    selectedCompanyIds.value = selectedCompanyIds.value.filter(
+        (id) => id !== companyId,
+    );
+};
+
+const loadMoreCompanies = (event: Event) => {
+    const target = event.target as HTMLElement;
+
+    const isNearBottom =
+        target.scrollTop + target.clientHeight >= target.scrollHeight - 8;
+
+    if (!isNearBottom || !hasMoreCompanies.value) {
+        return;
+    }
+
+    companyVisibleLimit.value += 4;
 };
 
 const selectUserType = (userType: UserType) => {
@@ -184,7 +247,7 @@ const closeCompanyLookup = () => {
 };
 
 const saveUser = () => {
-    addUserForm.client_id = selectedCompanyId.value;
+    addUserForm.client_ids = selectedCompanyIds.value;
     addUserForm.user_type_id = selectedUserTypeId.value;
 
     addUserForm.post('/settings/users/', {
@@ -193,7 +256,7 @@ const saveUser = () => {
             addUserDialogOpen.value = false;
             addUserForm.reset();
             companySearch.value = '';
-            selectedCompanyId.value = null;
+            selectedCompanyIds.value = [];
             profileSearch.value = '';
             selectedUserTypeId.value = null;
             toast.success('User has been added. Account setup email will be sent shortly.');
@@ -212,6 +275,17 @@ watch(search, (value, _oldValue, onCleanup) => {
 
     onCleanup(() => window.clearTimeout(searchDelay));
 
+});
+
+watch(companySearch, () => {
+    companyVisibleLimit.value = 5;
+});
+
+watch(profileSearch, (value) => {
+    if (value.trim() === '') {
+        selectedUserTypeId.value = null;
+        profileLookupOpen.value = true;
+    }
 });
 
 
@@ -333,8 +407,8 @@ class="h-8 gap-2 text-white hover:bg-red-700">
                                 <div class="relative">
                                     <Input id="profile" v-model="profileSearch" type="search"
                                         placeholder="Search profile..." autocomplete="off"
-                                        @focus="profileLookupOpen = true" @blur="closeProfileLookup"
-                                        @keydown.escape="profileLookupOpen = false" />
+                                        @focus="profileLookupOpen = true" @input="profileLookupOpen = true"
+                                        @blur="closeProfileLookup" @keydown.escape="profileLookupOpen = false" />
 
                                     <InputError :message="addUserForm.errors.user_type_id" />
 
@@ -360,17 +434,35 @@ class="h-8 gap-2 text-white hover:bg-red-700">
                                 <div class="relative">
                                     <Input id="company" v-model="companySearch" type="search"
                                         placeholder="Search company..." autocomplete="off"
-                                        @focus="companyLookupOpen = true" @blur="closeCompanyLookup"
+                                        @focus="companyLookupOpen = true" @input="companyLookupOpen = true"
+                                        @blur="closeCompanyLookup"
                                         @keydown.escape="companyLookupOpen = false" />
-                                    <InputError :message="addUserForm.errors.client_id" />
+                                    <InputError :message="addUserForm.errors.client_ids" />
+                                    <div v-if="selectedCompanies.length > 0" class="mt-2 flex flex-wrap gap-2">
+                                        <span v-for="company in selectedCompanies" :key="company.id"
+                                            class="inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium">
+                                            {{ company.company_name }}
+
+                                            <button type="button" class="text-muted-foreground hover:text-foreground"
+                                                :aria-label="`Remove ${company.company_name}`" @mousedown.prevent
+                                                @click="removeCompany(company.id)">
+                                                ×
+                                            </button>
+                                        </span>
+                                    </div>
 
                                     <div v-if="companyLookupOpen"
-                                        class="absolute z-50 mt-1 max-h-56 w-full overflow-y-auto rounded-md border bg-popover p-1 text-popover-foreground shadow-md">
-                                        <button v-for="company in filteredCompanies" :key="company.id" type="button"
+                                        class="absolute z-50 mt-1 max-h-56 w-full overflow-y-auto rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
+                                        @scroll="loadMoreCompanies">
+                                        <button v-for="company in visibleCompanies" :key="company.id" type="button"
                                             class="flex w-full items-center rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent hover:text-accent-foreground"
                                             @mousedown.prevent="selectCompany(company)">
                                             {{ company.company_name }}
                                         </button>
+
+                                        <div v-if="hasMoreCompanies" class="px-2 py-2 text-xs text-muted-foreground">
+                                            Type to search more company...
+                                        </div>
 
                                         <div v-if="filteredCompanies.length === 0"
                                             class="px-2 py-2 text-sm text-muted-foreground">
@@ -418,6 +510,9 @@ class="h-8 gap-2 text-white hover:bg-red-700">
                             </DropdownMenuItem>
                             <DropdownMenuItem @click="changeStatusFilter('all')">
                                 All
+                            </DropdownMenuItem>
+                            <DropdownMenuItem @click="changeStatusFilter('pending')">
+                                Pending
                             </DropdownMenuItem>
                             <DropdownMenuItem @click="changeStatusFilter('inactive')">
                                 Inactive
@@ -467,8 +562,35 @@ class="h-8 gap-2 text-white hover:bg-red-700">
                                 <td class="truncate px-4 py-3">
                                     {{ user.last_name }}
                                 </td>
-                                <td class="truncate px-4 py-3">
-                                    {{ user.client?.company_name ?? '-' }}
+                                <td class="px-4 py-3">
+                                    <div v-if="user.clients.length" class="flex min-w-0 items-center gap-2">
+                                        <span class="truncate">
+                                            {{ user.clients[0].company_name }}
+                                        </span>
+
+                                        <TooltipProvider v-if="user.clients.length > 1" :delay-duration="100">
+                                            <Tooltip>
+                                                <TooltipTrigger as-child>
+                                                    <button type="button"
+                                                        class="inline-flex shrink-0 items-center rounded-full border border-border bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+                                                        +{{ user.clients.length - 1 }}
+                                                    </button>
+                                                </TooltipTrigger>
+
+                                                <TooltipContent side="top" align="center"
+                                                    class="max-w-[calc(100vw-2rem)] border border-border bg-popover px-3 py-2 text-popover-foreground shadow-md">
+                                                    <div class="space-y-1">
+                                                        <div v-for="client in user.clients.slice(1)" :key="client.id"
+                                                            class="text-sm">
+                                                            {{ client.company_name }}
+                                                        </div>
+                                                    </div>
+                                                </TooltipContent>
+                                            </Tooltip>
+                                        </TooltipProvider>
+                                    </div>
+
+                                    <span v-else>-</span>
                                 </td>
                                 <td class="truncate px-4 py-3">
                                     {{ user.email }}
@@ -486,17 +608,25 @@ class="h-8 gap-2 text-white hover:bg-red-700">
                                 <td class="truncate px-4 py-3">
                                     {{ user.mobile ?? '-' }}
                                 </td>
-                                <td class="px-4 py-3 text-center">
-                                    <button type="button"
-                                        class="inline-flex size-8 items-center justify-center rounded-md border transition-all"
-                                        :class="user.status === 'active'
+                                <td class="px-4 py-3">
+                                    <div class="flex items-center justify-center gap-2">
+                                        <button type="button"
+                                            class="inline-flex size-8 shrink-0 items-center justify-center rounded-md border border-border bg-background text-muted-foreground shadow-sm transition-all hover:bg-muted/60 hover:text-foreground"
+                                            title="Edit user" aria-label="Edit user" @click="openEditUser(user)">
+                                            <Pencil class="size-4" />
+                                        </button>
+
+                                        <button type="button"
+                                            class="inline-flex size-8 shrink-0 items-center justify-center rounded-md border transition-all"
+                                            :class="user.status === 'active'
                                                 ? 'border-border bg-muted text-foreground shadow-inner ring-1 ring-border'
-                                                : 'border-border bg-background text-muted-foreground shadow-sm hover:bg-muted/60 hover:text-foreground'
-                                            " :title="user.status === 'active' ? 'Deactivate user' : 'Activate user'"
-                                        :aria-label="user.status === 'active' ? 'Deactivate user' : 'Activate user'"
-                                        @click="toggleStatus(user)">
-                                        <User class="size-4" />
-                                    </button>
+    : 'border-border bg-background text-muted-foreground shadow-sm hover:bg-muted/60 hover:text-foreground'"
+                                            :title="user.status === 'active' ? 'Deactivate user' : 'Activate user'"
+                                            :aria-label="user.status === 'active' ? 'Deactivate user' : 'Activate user'"
+                                            @click="toggleStatus(user)">
+                                            <User class="size-4" />
+                                        </button>
+                                    </div>
                                 </td>
                             </tr>
 
@@ -546,7 +676,34 @@ class="h-8 gap-2 text-white hover:bg-red-700">
                                     Company
                                 </dt>
                                 <dd class="mt-1">
-                                    {{ user.client?.company_name ?? '-' }}
+                                    <div v-if="user.clients.length" class="flex min-w-0 items-center gap-2">
+                                        <span class="truncate">
+                                            {{ user.clients[0].company_name }}
+                                        </span>
+
+                                        <TooltipProvider v-if="user.clients.length > 1" :delay-duration="100">
+                                            <Tooltip>
+                                                <TooltipTrigger as-child>
+                                                    <button type="button"
+                                                        class="inline-flex shrink-0 items-center rounded-full border border-border bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+                                                        +{{ user.clients.length - 1 }}
+                                                    </button>
+                                                </TooltipTrigger>
+
+                                                <TooltipContent side="top" align="center"
+                                                    class="max-w-[calc(100vw-2rem)] border border-border bg-popover px-3 py-2 text-popover-foreground shadow-md">
+                                                    <div class="space-y-1">
+                                                        <div v-for="client in user.clients.slice(1)" :key="client.id"
+                                                            class="text-sm">
+                                                            {{ client.company_name }}
+                                                        </div>
+                                                    </div>
+                                                </TooltipContent>
+                                            </Tooltip>
+                                        </TooltipProvider>
+                                    </div>
+
+                                    <span v-else>-</span>
                                 </dd>
                             </div>
 
@@ -596,5 +753,7 @@ class="h-8 gap-2 text-white hover:bg-red-700">
                 </div>
             </div>
         </div>
+        <EditUserForm v-if="selectedUser" v-model:open="editUserDialogOpen" :user="selectedUser" :companies="companies"
+            :user-types="userTypes" @saved="selectedUser = null" />
     </SettingsLayout>
 </template>

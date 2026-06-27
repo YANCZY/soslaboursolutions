@@ -21,7 +21,7 @@ class EmployeeSettingsController extends Controller
 
         $status = $request->query('status', 'active');
 
-        if (! in_array($status, ['active', 'inactive', 'all'], true)) {
+        if (! in_array($status, ['active', 'inactive', 'pending', 'all'], true)) {
             $status = 'active';
         }
 

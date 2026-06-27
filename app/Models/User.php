@@ -16,8 +16,8 @@ use Illuminate\Contracts\Auth\MustVerifyEmail;
 use App\Notifications\AccountAccessNotification;
 use App\Models\Attendance;
 use Illuminate\Database\Eloquent\Relations\HasOne;
-
-
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 
 #[Fillable(['first_name', 'last_name', 'user_type_id', 'client_id', 'email', 'password', 'status', 'phone', 'mobile'])]
@@ -90,9 +90,20 @@ class User extends Authenticatable implements MustVerifyEmail
         return $this->belongsTo(Client::class);
     }
 
+    public function clients(): BelongsToMany
+    {
+        return $this->belongsToMany(Client::class)->withTimestamps();
+    }
+
+
     public function profile(): HasOne
     {
         return $this->hasOne(Profile::class);
+    }
+
+    public function companyWorkDetails(): HasMany
+    {
+        return $this->hasMany(UserCompanyWorkDetail::class);
     }
 
     public function sendPasswordResetNotification($token): void

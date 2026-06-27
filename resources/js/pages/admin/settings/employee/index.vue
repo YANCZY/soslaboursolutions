@@ -1,19 +1,12 @@
 <script setup lang="ts">
-import { Head, Link, router, useForm  } from '@inertiajs/vue3';
+import { Head, Link, router } from '@inertiajs/vue3';
 import { Filter, Plus, Search, User } from 'lucide-vue-next';
 import { computed, ref, watch } from 'vue';
 import { toast } from 'vue-sonner';
 import Heading from '@/components/Heading.vue';
-import InputError from '@/components/InputError.vue';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
-    DialogClose,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
     DialogTrigger,
 } from '@/components/ui/dialog';
 import {
@@ -22,9 +15,10 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import SettingsLayout from '@/layouts/settings/Layout.vue';
+import EmployeeAddForm from '@/views/settings/employee/EmployeeAddForm.vue';
 
 
 
@@ -69,13 +63,13 @@ const props = defineProps<{
     userTypes: UserType[];
     filters: {
         search: string;
-        status: 'active' | 'inactive' | 'all';
+        status: 'active' | 'inactive' | 'pending' | 'all';
     };
 }>();
 
 const search = ref(props.filters.search ?? '');
 
-type StatusFilter = 'active' | 'inactive' | 'all';
+type StatusFilter = 'active' | 'inactive' | 'pending' | 'all';
 
 const statusFilter = ref<StatusFilter>(props.filters.status ?? 'active');
 
@@ -107,63 +101,7 @@ const changeStatusFilter = (status: StatusFilter) => {
     applyFilters();
 };
 
-const profileSearch = ref('');
-const profileLookupOpen = ref(false);
-const selectedUserTypeId = ref<number | null>(null);
-
 const addUserDialogOpen = ref(false);
-
-const addUserForm = useForm({
-    first_name: '',
-    last_name: '',
-    email: '',
-    phone: '',
-    client_id: null as number | null,
-    user_type_id: null as number | null,
-});
-
-
-const filteredUserTypes = computed(() => {
-    const value = profileSearch.value.trim().toLowerCase();
-
-    if (!value) {
-        return props.userTypes;
-    }
-
-    return props.userTypes.filter((userType) =>
-        userType.user_type_name.toLowerCase().includes(value),
-    );
-});
-
-const selectUserType = (userType: UserType) => {
-    selectedUserTypeId.value = userType.id;
-    profileSearch.value = userType.user_type_name;
-    profileLookupOpen.value = false;
-};
-
-const closeProfileLookup = () => {
-    window.setTimeout(() => {
-        profileLookupOpen.value = false;
-    }, 100);
-};
-
-const saveUser = () => {
-    addUserForm.user_type_id = selectedUserTypeId.value;
-
-    addUserForm.post('/settings/employee', {
-        preserveScroll: true,
-        onSuccess: () => {
-            addUserDialogOpen.value = false;
-            addUserForm.reset();
-            profileSearch.value = '';
-            selectedUserTypeId.value = null;
-            toast.success('User has been added. Account setup email will be sent shortly.');
-        },
-
-    });
-};
-
-
 
 watch(search, (value, _oldValue, onCleanup) => {
 
@@ -253,81 +191,7 @@ defineOptions({
                         </Button>
                     </DialogTrigger>
 
-                    <DialogContent class="sm:max-w-lg">
-                        <DialogHeader>
-                            <DialogTitle>Add employee</DialogTitle>
-                            <DialogDescription>
-                                Create an employee profile for workspace access.
-                            </DialogDescription>
-                        </DialogHeader>
-
-                        <div class="grid gap-4 py-2 sm:grid-cols-2">
-                            <div class="grid gap-2">
-                                <Label for="first_name">First name</Label>
-                                <Input id="first_name" v-model="addUserForm.first_name" placeholder="First name" />
-                                <InputError :message="addUserForm.errors.first_name" />
-                            </div>
-
-                            <div class="grid gap-2">
-                                <Label for="last_name">Last name</Label>
-                                <Input id="last_name" v-model="addUserForm.last_name" placeholder="Last name" />
-                                <InputError :message="addUserForm.errors.last_name" />
-                            </div>
-
-                            <div class="grid gap-2">
-                                <Label for="email">Email</Label>
-                                <Input id="email" v-model="addUserForm.email" type="email"
-                                    placeholder="email@example.com" />
-                                <InputError :message="addUserForm.errors.email" />
-                            </div>
-
-                            <div class="grid gap-2">
-                                <Label for="phone">Phone</Label>
-                                <Input id="phone" v-model="addUserForm.phone" placeholder="Phone number" />
-                                <InputError :message="addUserForm.errors.phone" />
-                            </div>
-
-                            <div class="grid gap-2 sm:col-span-2">
-                                <Label for="profile">Profile</Label>
-
-                                <div class="relative">
-                                    <Input id="profile" v-model="profileSearch" type="search"
-                                        placeholder="Search profile..." autocomplete="off"
-                                        @focus="profileLookupOpen = true" @blur="closeProfileLookup"
-                                        @keydown.escape="profileLookupOpen = false" />
-
-                                    <InputError :message="addUserForm.errors.user_type_id" />
-
-                                    <div v-if="profileLookupOpen"
-                                        class="absolute z-50 mt-1 max-h-56 w-full overflow-y-auto rounded-md border bg-popover p-1 text-popover-foreground shadow-md">
-                                        <button v-for="userType in filteredUserTypes" :key="userType.id" type="button"
-                                            class="flex w-full items-center rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent hover:text-accent-foreground"
-                                            @mousedown.prevent="selectUserType(userType)">
-                                            {{ userType.user_type_name }}
-                                        </button>
-
-                                        <div v-if="filteredUserTypes.length === 0"
-                                            class="px-2 py-2 text-sm text-muted-foreground">
-                                            No profiles found.
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <DialogFooter>
-                            <DialogClose as-child>
-                                <Button type="button" variant="secondary">
-                                    Cancel
-                                </Button>
-                            </DialogClose>
-
-                            <Button type="button" class="bg-red-600 text-white" :disabled="addUserForm.processing"
-                                @click="saveUser">
-                                Save employee
-                            </Button>
-                        </DialogFooter>
-                    </DialogContent>
+                    <EmployeeAddForm :user-types="userTypes" @success="addUserDialogOpen = false" />
                 </Dialog>
 
                 <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -353,6 +217,9 @@ defineOptions({
                             </DropdownMenuItem>
                             <DropdownMenuItem @click="changeStatusFilter('all')">
                                 All
+                            </DropdownMenuItem>
+                            <DropdownMenuItem @click="changeStatusFilter('pending')">
+                                Pending
                             </DropdownMenuItem>
                             <DropdownMenuItem @click="changeStatusFilter('inactive')">
                                 Inactive

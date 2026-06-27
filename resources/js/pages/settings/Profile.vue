@@ -13,6 +13,21 @@ import { Label } from '@/components/ui/label';
 import EditProfileForm from '@/views/settings/profile/EditProfileForm.vue';
 
 
+type Company = {
+    id: number;
+    company_name: string;
+};
+
+type WorkDetail = {
+    client_id: number;
+    job_role?: string | null;
+    salary?: string | number | null;
+    travel_allowance?: string | number | null;
+    travel_allowance_currency?: string | null;
+    start_shift?: string | null;
+    end_shift?: string | null;
+    company?: Company | null;
+};
 
 type Props = {
     mustVerifyEmail: boolean;
@@ -23,6 +38,10 @@ type Props = {
         travel_allowance_currency?: string | null;
         salary?: string | number | null;
     };
+    companies: Company[];
+    workDetail?: WorkDetail | null;
+    workDetails: WorkDetail[];
+    selectedCompanyId?: number | null;
 };
 
 const props = defineProps<Props>();
@@ -45,6 +64,10 @@ defineOptions({
 const page = usePage();
 const user = computed(() => page.props.auth.user);
 const isEditing = ref(false);
+
+const selectedCompany = computed(() =>
+    props.companies.find((company) => company.id === props.selectedCompanyId) ?? null,
+);
 </script>
 
 <template>
@@ -87,18 +110,20 @@ const isEditing = ref(false);
                 </div>
 
                 <div class="grid gap-2">
-                    <Label>Job role</Label>
-                    <div class="rounded-md border px-3 py-2 text-sm">{{ props.profile.job_role || '-' }}</div>
+                    <Label>Company</Label>
+                    <div class="rounded-md border px-3 py-2 text-sm">
+                        {{ props.workDetail?.company?.company_name || selectedCompany?.company_name || '-' }}
+                    </div>
                 </div>
 
                 <div class="grid gap-2">
-                    <Label>Travel allowance</Label>
-                    <div class="rounded-md border px-3 py-2 text-sm">AU$ {{ props.profile.travel_allowance || '0.00' }}</div>
+                    <Label>Job role</Label>
+                    <div class="rounded-md border px-3 py-2 text-sm">{{ props.workDetail?.job_role || '-' }}</div>
                 </div>
 
                 <div class="grid gap-2">
                     <Label>Salary</Label>
-                    <div class="rounded-md border px-3 py-2 text-sm">AU$ {{ props.profile.salary || '0.00' }}</div>
+                    <div class="rounded-md border px-3 py-2 text-sm">AU$ {{ props.workDetail?.salary || '0.00' }}</div>
                 </div>
             </div>
 
@@ -113,6 +138,8 @@ const isEditing = ref(false);
             v-model:open="isEditing"
             :user="user"
             :profile="props.profile"
+:companies="props.companies"
+            :work-details="props.workDetails" :selected-company-id="props.selectedCompanyId"
             :must-verify-email="mustVerifyEmail"
             :status="status"
             @saved="isEditing = false"
