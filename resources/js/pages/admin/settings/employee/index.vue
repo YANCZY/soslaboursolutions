@@ -161,7 +161,7 @@ defineOptions({
                 href: '/settings',
             },
             {
-                title: 'Employee',
+                title: 'Users',
                 href: '/settings/employee',
             },
         ],
@@ -170,15 +170,16 @@ defineOptions({
 </script>
 
 <template>
-    <Head title="Employee" />
+
+    <Head title="Users" />
 
     <SettingsLayout>
-        <h1 class="sr-only">Employee</h1>
+        <h1 class="sr-only">Users</h1>
 
         <div class="flex flex-col gap-4">
             <Heading
                 variant="small"
-                title="Employee"
+title="Users"
                 description="Manage employees for this company"
             />
 
@@ -187,7 +188,7 @@ defineOptions({
                     <DialogTrigger as-child>
                         <Button type="button" class="h-8 gap-2 text-white hover:bg-red-700">
                             <Plus class="size-4" />
-                            Add employee
+                            Add user
                         </Button>
                     </DialogTrigger>
 
@@ -198,14 +199,14 @@ defineOptions({
                     <div class="relative w-40 transition-[width] duration-200 ease-in-out hover:w-64 focus-within:w-64">
                         <Search
                             class="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
-                        <Input v-model="search" type="search" placeholder="Search employees..."
+                        <Input v-model="search" type="search" placeholder="Search users..."
                             class="h-8 pl-8 text-sm" />
                     </div>
 
                     <DropdownMenu>
                         <DropdownMenuTrigger as-child>
-                            <Button type="button" variant="outline" class="h-8 gap-2" title="Filter employees"
-                                aria-label="Filter employees">
+                            <Button type="button" variant="outline" class="h-8 gap-2" title="Filter users"
+                                aria-label="Filter users">
                                 <Filter class="size-4" />
                                 {{ statusFilterLabel }}
                             </Button>
@@ -304,7 +305,7 @@ defineOptions({
 
                             <tr v-if="employees.data.length === 0">
                                 <td colspan="8" class="px-4 py-6 text-center text-muted-foreground">
-                                    No employees found.
+                                    No users found.
                                 </td>
                             </tr>
                         </tbody>
@@ -380,8 +381,7 @@ defineOptions({
                 <div class="border-t px-4 py-3">
                     <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                         <p class="text-sm text-muted-foreground">
-                            Showing {{ employees.from }} to {{ employees.to }} of
-                            {{ employees.total }} employees
+                            Showing {{ employees.from }} to {{ employees.to }} of {{ employees.total }} users
                         </p>
 
                         <div class="flex flex-wrap items-center gap-2">

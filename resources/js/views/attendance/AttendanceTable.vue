@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ChevronLeft, ChevronRight, Pencil, Search, Trash2 } from 'lucide-vue-next';
+import { ChevronLeft, ChevronRight, Info, Pencil, Search, Trash2 } from 'lucide-vue-next';
 import { computed, ref, watch } from 'vue';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -31,7 +31,8 @@ import {
 } from '@/components/ui/tooltip';
 import EditAttendance from '@/views/attendance/EditAttendance.vue';
 
-type AttendanceProfile = {
+type AttendanceWorkDetail = {
+    client_id: number;
     start_shift: string | null;
     end_shift: string | null;
 };
@@ -39,7 +40,12 @@ type AttendanceProfile = {
 type AttendanceUser = {
     first_name: string;
     last_name: string;
-    profile?: AttendanceProfile | null;
+    company_work_details?: AttendanceWorkDetail[];
+};
+
+type AttendanceCompany = {
+    id: number;
+    company_name: string;
 };
 
 type Attendance = {
@@ -51,6 +57,32 @@ type Attendance = {
     lunch_end_time: string | null;
     total_working_seconds: number | null;
     user?: AttendanceUser | null;
+    client?: AttendanceCompany | null;
+};
+
+const formatCompanyName = (record: Attendance) => {
+    return record.client?.company_name ?? '-';
+};
+
+const companyShiftLabel = (record: Attendance) => {
+    const startShift = shiftStartTime(record);
+    const endShift = shiftEndTime(record);
+
+    if (!startShift || !endShift) {
+        return 'No shift assigned for this company.';
+    }
+
+    return `${formatTime(startShift)} - ${formatTime(endShift)}`;
+};
+
+const assignedWorkDetail = (record: Attendance) => {
+    if (!record.client?.id) {
+        return null;
+    }
+
+    return record.user?.company_work_details?.find(
+        (detail) => detail.client_id === record.client?.id,
+    ) ?? null;
 };
 
 const props = defineProps<{
@@ -239,11 +271,11 @@ const totalLunchBreakSeconds = (record: Attendance) => {
 };
 
 const shiftStartTime = (record: Attendance) => {
-    return record.user?.profile?.start_shift ?? null;
+    return assignedWorkDetail(record)?.start_shift ?? null;
 };
 
 const shiftEndTime = (record: Attendance) => {
-    return record.user?.profile?.end_shift ?? null;
+    return assignedWorkDetail(record)?.end_shift ?? null;
 };
 
 const checkInIndicator = (record: Attendance) => {
@@ -604,6 +636,7 @@ const visibleTableRowCount = computed(() => {
                         <tr>
                             <th class="w-12 px-4 py-3"><span class="sr-only">Select attendance</span></th>
                             <th class="px-4 py-3 font-weight-bold">Name</th>
+                            <th class="px-4 py-3 font-weight-bold">Company</th>
                             <th class="px-4 py-3 font-weight-bold">Date</th>
                             <th class="px-4 py-3 font-weight-bold">Check In</th>
                             <th class="px-4 py-3 font-weight-bold">Check Out</th>
@@ -632,7 +665,7 @@ const visibleTableRowCount = computed(() => {
                                 </td>
 
                                 <td
-                                    colspan="8"
+                                    colspan="9"
                                     class="px-4 py-2 text-sm font-semibold"
                                 >
                                     {{ formatDate(group.date) }}
@@ -656,6 +689,38 @@ const visibleTableRowCount = computed(() => {
                                 </td>
                                 <td class="px-4 py-3 font-medium">
                                     {{ formatUserName(record.user) }}
+                                </td>
+                                <td class="px-4 py-3">
+                                    <div class="flex items-center gap-2">
+                                        <TooltipProvider :delay-duration="100">
+                                            <Tooltip>
+                                                <TooltipTrigger as-child>
+                                                    <button
+                                                        type="button"
+                                                        class="inline-flex size-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                                                        :aria-label="`View shift for ${formatCompanyName(record)}`"
+                                                    >
+                                                        <Info class="size-4" />
+                                                    </button>
+                                                </TooltipTrigger>
+
+                                                <TooltipContent
+                                                    side="top"
+                                                    align="center"
+                                                    class="border border-border bg-popover px-3 py-2 text-popover-foreground shadow-md"
+                                                >
+                                                    <div class="space-y-1 text-sm">
+                                                        <div class="font-medium">{{ formatCompanyName(record) }}</div>
+                                                        <div class="text-muted-foreground">
+                                                            Shift: {{ companyShiftLabel(record) }}
+                                                        </div>
+                                                    </div>
+                                                </TooltipContent>
+                                            </Tooltip>
+                                        </TooltipProvider>
+
+                                        <span>{{ formatCompanyName(record) }}</span>
+                                    </div>
                                 </td>
                                 <td class="px-4 py-3">
                                     {{ formatDate(record.check_in_date) }}
@@ -774,7 +839,7 @@ const visibleTableRowCount = computed(() => {
 
                         <tr v-if="filteredAttendanceRecords.length === 0">
                             <td
-                                colspan="9"
+                                colspan="10"
                                 class="px-4 py-8 text-center text-muted-foreground"
                             >
                                 No attendance records found.

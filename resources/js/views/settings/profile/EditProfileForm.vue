@@ -3,6 +3,7 @@ import { Link, useForm } from '@inertiajs/vue3';
 import { X } from 'lucide-vue-next';
 import { computed, ref, watch } from 'vue';
 import InputError from '@/components/InputError.vue';
+import ShiftTimePicker from '@/components/ShiftTimePicker.vue';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -82,6 +83,10 @@ const closeCompanyLookup = () => {
     }, 100);
 };
 
+const selectedWorkDetail = computed(() =>
+    props.workDetails.find((detail) => detail.client_id === selectedCompanyId),
+);
+
 
 const form = useForm({
     first_name: props.user.first_name ?? '',
@@ -102,8 +107,8 @@ const form = useForm({
         props.profile.salary !== null && props.profile.salary !== undefined
             ? String(props.profile.salary)
             : '',
-    start_shift: props.profile.start_shift ?? '',
-    end_shift: props.profile.end_shift ?? '',
+    start_shift: selectedWorkDetail.value?.start_shift ?? '',
+    end_shift: selectedWorkDetail.value?.end_shift ?? '',
 });
 
 const filteredCompanies = computed(() => {
@@ -137,13 +142,70 @@ watch(companySearch, (value) => {
 
 const selectCompany = (company: Company) => {
     form.client_id = company.id;
+    const workDetail = props.workDetails.find((detail) => detail.client_id === company.id);
+
+    form.job_role = workDetail?.job_role ?? '';
+    form.salary = workDetail?.salary !== null && workDetail?.salary !== undefined ? String(workDetail.salary) : '';
+    form.travel_allowance =
+        workDetail?.travel_allowance !== null && workDetail?.travel_allowance !== undefined
+            ? String(workDetail.travel_allowance)
+            : '';
+    form.travel_allowance_currency = workDetail?.travel_allowance_currency ?? 'AUD';
+    form.start_shift = workDetail?.start_shift ?? '';
+    form.end_shift = workDetail?.end_shift ?? '';
     selectedCompanyLabel.value = company.company_name;
     companySearch.value = company.company_name;
     companyLookupOpen.value = false;
 };
 
+const toBackendTime = (value: string | null) => {
+    if (!value) {
+        return '';
+    }
+
+    const trimmedValue = value.trim();
+
+    if (/^\d{2}:\d{2}$/.test(trimmedValue)) {
+        return trimmedValue;
+    }
+
+    if (/^\d{2}:\d{2}:\d{2}$/.test(trimmedValue)) {
+        return trimmedValue.slice(0, 5);
+    }
+
+    const match = trimmedValue.match(/^(0[1-9]|1[0-2]):([0-5][0-9])\s(AM|PM)$/i);
+
+    if (!match) {
+        return trimmedValue;
+    }
+
+    let hour = Number(match[1]);
+    const minute = match[2];
+    const period = match[3].toUpperCase();
+
+    if (period === 'PM' && hour !== 12) {
+        hour += 12;
+    }
+
+    if (period === 'AM' && hour === 12) {
+        hour = 0;
+    }
+
+    return `${String(hour).padStart(2, '0')}:${minute}`;
+};
+
 function submit() {
-    form.patch('/settings/profile', {
+    form
+        .transform((data) => {
+            const payload = {
+                ...data,
+                start_shift: toBackendTime(data.start_shift),
+                end_shift: toBackendTime(data.end_shift),
+            };
+
+            return payload;
+        })
+        .patch('/settings/profile', {
         preserveScroll: true,
         onSuccess: () => {
             emit('saved');
@@ -310,22 +372,22 @@ function submit() {
                         <div class="grid gap-6 md:grid-cols-2">
                             <div class="space-y-2">
                                 <Label for="start_shift">Start shift</Label>
-                                <Input
+                                <ShiftTimePicker
                                     id="start_shift"
-                                    v-model="form.start_shift"
-                                    type="time"
+v-model="form.start_shift"
                                     name="start_shift"
+                                    placeholder="Select start time"
                                 />
                                 <InputError :message="form.errors.start_shift" />
                             </div>
 
                             <div class="space-y-2">
                                 <Label for="end_shift">End shift</Label>
-                                <Input
+                                <ShiftTimePicker
                                     id="end_shift"
-                                    v-model="form.end_shift"
-                                    type="time"
+v-model="form.end_shift"
                                     name="end_shift"
+                                    placeholder="Select end time"
                                 />
                                 <InputError :message="form.errors.end_shift" />
                             </div>

@@ -8,6 +8,7 @@ use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Inertia\Inertia;
 use Inertia\Response;
+use Illuminate\Validation\Rule;
 
 class AttendanceController extends Controller
 {
@@ -18,6 +19,25 @@ class AttendanceController extends Controller
     {
         $user = $request->user();
 
+        $user->load('companyWorkDetails:id,user_id,client_id,start_shift,end_shift');
+
+        $companies = $user
+        ->clients()
+        ->select('clients.id', 'clients.company_name')
+        ->orderBy('company_name')
+        ->get()
+        ->map(function ($company) use ($user) {
+            $workDetail = $user->companyWorkDetails
+                ->firstWhere('client_id', $company->id);
+
+            return [
+                'id' => $company->id,
+                'company_name' => $company->company_name,
+                'start_shift' => $workDetail?->start_shift,
+                'end_shift' => $workDetail?->end_shift,
+            ];
+        });
+
         $todayAttendance = $this->latestOpenAttendance($request);
 
         $weekStart = now($this->userTimezone($request))->startOfWeek(Carbon::SUNDAY)->toDateString();
@@ -26,7 +46,8 @@ class AttendanceController extends Controller
         $weeklyAttendance = Attendance::query()
             ->with([
                 'user:id,first_name,last_name',
-                'user.profile:id,user_id,start_shift,end_shift',
+            'client:id,company_name',
+            'user.companyWorkDetails:id,user_id,client_id,start_shift,end_shift',
             ])
             ->where('employee_id', $user->id)
             ->whereBetween('check_in_date', [$weekStart, $weekEnd])
@@ -34,39 +55,62 @@ class AttendanceController extends Controller
             ->orderByDesc('check_in_time')
             ->get();
 
+        $attendanceRecords = Attendance::query()
+            ->with([
+                'user:id,first_name,last_name',
+                'client:id,company_name',
+                'user.companyWorkDetails:id,user_id,client_id,start_shift,end_shift',
+            ])
+            ->where('employee_id', $user->id)
+            ->orderByDesc('check_in_date')
+            ->orderByDesc('check_in_time')
+            ->get();
 
         return Inertia::render('attendance/index', [
             'todayAttendance' => $todayAttendance,
             'weeklyAttendance' => $weeklyAttendance,
+            'attendanceRecords' => $attendanceRecords,
+            'companies' => $companies,
         ]);
 
     }
 
     public function checkIn(Request $request): JsonResponse
-{
-    $now = now($this->userTimezone($request));
+    {
+        $now = now($this->userTimezone($request));
 
-    $activeAttendance = $this->latestOpenAttendance($request);
+        $activeAttendance = $this->latestOpenAttendance($request);
 
-    if ($activeAttendance) {
+        if ($activeAttendance) {
+            return response()->json([
+                'message' => 'Already checked in.',
+                'attendance' => $activeAttendance,
+            ]);
+        }
+
+        $validated = $request->validate([
+            'client_id' => [
+                'required',
+                'integer',
+                Rule::exists('client_user', 'client_id')->where(
+                    fn($query) => $query->where('user_id', $request->user()->id)
+                ),
+            ],
+        ]);
+
+        $attendance = Attendance::query()->create([
+            'employee_id' => $request->user()->id,
+            'check_in_date' => $now->toDateString(),
+            'status' => 'checked_in',
+            'check_in_time' => $now->format('H:i:s'),
+            'client_id' => $validated['client_id'],
+        ]);
+
         return response()->json([
-            'message' => 'Already checked in.',
-            'attendance' => $activeAttendance,
+            'message' => 'Checked in successfully.',
+            'attendance' => $attendance->fresh(),
         ]);
     }
-
-    $attendance = Attendance::query()->create([
-        'employee_id' => $request->user()->id,
-        'check_in_date' => $now->toDateString(),
-        'status' => 'checked_in',
-        'check_in_time' => $now->format('H:i:s'),
-    ]);
-
-    return response()->json([
-        'message' => 'Checked in successfully.',
-        'attendance' => $attendance->fresh(),
-    ]);
-}
 
     public function startLunch(Request $request): JsonResponse
     {
@@ -318,6 +362,7 @@ class AttendanceController extends Controller
     private function latestOpenAttendance(Request $request): ?Attendance
     {
         return Attendance::query()
+            ->with('client:id,company_name')
             ->where('employee_id', $request->user()->id)
             ->whereNotNull('check_in_time')
             ->whereNull('check_out_time')

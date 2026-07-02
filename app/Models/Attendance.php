@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use App\Models\Client;
 
 class Attendance extends Model
 {
@@ -12,6 +13,7 @@ class Attendance extends Model
     protected $fillable = [
         'check_in_date',
         'employee_id',
+        'client_id',
         'status',
         'check_in_time',
         'check_out_time',
@@ -31,5 +33,10 @@ class Attendance extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class, 'employee_id');
+    }
+
+    public function client(): BelongsTo
+    {
+        return $this->belongsTo(Client::class);
     }
 }

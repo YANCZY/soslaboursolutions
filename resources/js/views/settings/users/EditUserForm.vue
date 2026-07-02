@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useForm } from '@inertiajs/vue3';
-import { computed, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 import InputError from '@/components/InputError.vue';
 import { Button } from '@/components/ui/button';
 import {
@@ -57,8 +57,33 @@ const form = useForm({
     client_ids: [] as number[],
 });
 
+const companySearch = ref('');
+const companyLookupOpen = ref(false);
+const companyVisibleLimit = ref(5);
+
 const selectedCompanies = computed(() =>
     props.companies.filter((company) => form.client_ids.includes(company.id)),
+);
+
+const filteredCompanies = computed(() => {
+    const value = companySearch.value.trim().toLowerCase();
+
+    return props.companies.filter((company) => {
+        const matchesSearch =
+            !value || company.company_name.toLowerCase().includes(value);
+
+        const isAlreadySelected = form.client_ids.includes(company.id);
+
+        return matchesSearch && !isAlreadySelected;
+    });
+});
+
+const visibleCompanies = computed(() =>
+    filteredCompanies.value.slice(0, companyVisibleLimit.value),
+);
+
+const hasMoreCompanies = computed(
+    () => companyVisibleLimit.value < filteredCompanies.value.length,
 );
 
 const resetForm = () => {
@@ -69,6 +94,9 @@ const resetForm = () => {
     form.mobile = props.user.mobile ?? '';
     form.user_type_id = props.user.user_type_id;
     form.client_ids = props.user.clients.map((client) => client.id);
+    companySearch.value = '';
+    companyLookupOpen.value = false;
+    companyVisibleLimit.value = 5;
     form.clearErrors();
 };
 
@@ -82,10 +110,8 @@ watch(
     { immediate: true },
 );
 
-const toggleCompany = (companyId: number) => {
-    if (form.client_ids.includes(companyId)) {
-        form.client_ids = form.client_ids.filter((id) => id !== companyId);
-
+const selectCompany = (company: Company) => {
+    if (form.client_ids.includes(company.id)) {
         return;
     }
 
@@ -96,7 +122,33 @@ const toggleCompany = (companyId: number) => {
     }
 
     form.clearErrors('client_ids');
-    form.client_ids = [...form.client_ids, companyId];
+    form.client_ids = [...form.client_ids, company.id];
+    companySearch.value = '';
+    companyLookupOpen.value = true;
+    companyVisibleLimit.value = 5;
+};
+
+const removeCompany = (companyId: number) => {
+    form.client_ids = form.client_ids.filter((id) => id !== companyId);
+};
+
+const closeCompanyLookup = () => {
+    window.setTimeout(() => {
+        companyLookupOpen.value = false;
+    }, 100);
+};
+
+const loadMoreCompanies = (event: Event) => {
+    const target = event.target as HTMLElement;
+
+    const isNearBottom =
+        target.scrollTop + target.clientHeight >= target.scrollHeight - 8;
+
+    if (!isNearBottom || !hasMoreCompanies.value) {
+        return;
+    }
+
+    companyVisibleLimit.value += 4;
 };
 
 const submit = () => {
@@ -171,29 +223,72 @@ const submit = () => {
                 </div>
 
                 <div class="grid gap-2">
-                    <Label>Companies</Label>
+    <Label for="edit_company">Companies</Label>
 
-                    <div class="flex flex-wrap gap-2">
-                        <button
-                            v-for="company in companies"
-                            :key="company.id"
-                            type="button"
-                            class="rounded-md border px-3 py-1.5 text-sm"
-                            :class="form.client_ids.includes(company.id)
-                                ? 'border-primary bg-primary text-primary-foreground'
-                                : 'border-border bg-background text-foreground hover:bg-muted'"
-                            @click="toggleCompany(company.id)"
-                        >
-                            {{ company.company_name }}
-                        </button>
-                    </div>
+    <div class="relative">
+        <Input
+            id="edit_company"
+            v-model="companySearch"
+            type="search"
+            placeholder="Search company..."
+            autocomplete="off"
+            @focus="companyLookupOpen = true"
+            @input="companyLookupOpen = true"
+            @blur="closeCompanyLookup"
+            @keydown.escape="companyLookupOpen = false"
+        />
 
-                    <p class="text-xs text-muted-foreground">
-                        Selected: {{ selectedCompanies.length }} of 3
-                    </p>
+        <div v-if="selectedCompanies.length > 0" class="mt-2 flex flex-wrap gap-2">
+            <span
+                v-for="company in selectedCompanies"
+                :key="company.id"
+                class="inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium"
+            >
+                {{ company.company_name }}
 
-                    <InputError :message="form.errors.client_ids" />
-                </div>
+                <button
+                    type="button"
+                    class="text-muted-foreground hover:text-foreground"
+                    :aria-label="`Remove ${company.company_name}`"
+                    @mousedown.prevent
+                    @click="removeCompany(company.id)"
+                >
+                    ×
+                </button>
+            </span>
+        </div>
+
+        <div
+            v-if="companyLookupOpen"
+            class="absolute z-50 mt-1 max-h-56 w-full overflow-y-auto rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
+            @scroll="loadMoreCompanies"
+        >
+            <button
+                v-for="company in visibleCompanies"
+                :key="company.id"
+                type="button"
+                class="flex w-full items-center rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent hover:text-accent-foreground"
+                @mousedown.prevent="selectCompany(company)"
+            >
+                {{ company.company_name }}
+            </button>
+
+            <div v-if="hasMoreCompanies" class="px-2 py-2 text-xs text-muted-foreground">
+                Type to search more company...
+            </div>
+
+            <div v-if="filteredCompanies.length === 0" class="px-2 py-2 text-sm text-muted-foreground">
+                No companies found.
+            </div>
+        </div>
+    </div>
+
+    <p class="text-xs text-muted-foreground">
+        Selected: {{ selectedCompanies.length }} of 3
+    </p>
+
+    <InputError :message="form.errors.client_ids" />
+</div>
             </div>
 
             <DialogFooter>
