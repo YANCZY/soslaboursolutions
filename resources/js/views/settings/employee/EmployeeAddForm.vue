@@ -81,7 +81,7 @@ const saveEmployee = () => {
             form.reset();
             profileSearch.value = '';
             selectedUserTypeId.value = null;
-            toast.success('Employee has been added. Account setup email will be sent shortly.');
+            toast.success('User has been added. Account setup email will be sent shortly.');
             emit('success');
         },
     });
@@ -91,9 +91,9 @@ const saveEmployee = () => {
 <template>
     <DialogContent class="sm:max-w-lg">
         <DialogHeader>
-            <DialogTitle>Add employee</DialogTitle>
+            <DialogTitle>Add user</DialogTitle>
             <DialogDescription>
-                Create an employee profile for workspace access.
+                Create a user profile for workspace access.
             </DialogDescription>
         </DialogHeader>
 
@@ -205,7 +205,7 @@ const saveEmployee = () => {
                 :disabled="form.processing"
                 @click="saveEmployee"
             >
-                Save employee
+                Save user
             </Button>
         </DialogFooter>
     </DialogContent>

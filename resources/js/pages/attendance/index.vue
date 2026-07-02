@@ -5,15 +5,21 @@ import AttendanceTable from '@/views/attendance/AttendanceTable.vue';
 import CheckInCard from '@/views/attendance/CheckInCard.vue';
 import TotalWorkingHoursCard from '@/views/attendance/TotalWorkingHoursCard.vue';
 
+type Company = {
+    id: number;
+    company_name: string;
+};
 
-defineProps<{
+const props = defineProps<{
     todayAttendance: Record<string, unknown> | null;
     weeklyAttendance: Record<string, unknown>[];
+    attendanceRecords: Record<string, unknown>[];
+    companies: Company[];
 }>();
 
 const refreshAttendance = () => {
     router.reload({
-        only: ['todayAttendance', 'weeklyAttendance'],
+        only: ['todayAttendance', 'weeklyAttendance', 'attendanceRecords', 'companies'],
         preserveScroll: true,
     });
 };
@@ -33,15 +39,16 @@ defineOptions({
     <div class="flex h-full flex-1 flex-col gap-4 overflow-x-auto p-4">
         <div class="grid gap-4 xl:grid-cols-[minmax(0,24rem)_1fr]">
             <CheckInCard
-                :attendance="todayAttendance"
+                :attendance="props.todayAttendance"
+                :companies="props.companies"
                 @attendance-updated="refreshAttendance"
             />
             <TotalWorkingHoursCard :weekly-attendance="weeklyAttendance" />
         </div>
 
         <Card>
-             <AttendanceTable
-                :attendance-records="weeklyAttendance"
+            <AttendanceTable
+                :attendance-records="props.attendanceRecords"
                 @attendance-updated="refreshAttendance"
             />
         </Card>
