@@ -79,6 +79,7 @@ const { isCurrentUrl } = useCurrentUrl();
                 :key="item.title"
             >
                 <SidebarMenuButton
+                    v-if="item.href && !item.disabled"
                     as-child
                     :is-active="isCurrentUrl(item.href)"
                     :tooltip="item.title"
@@ -87,6 +88,11 @@ const { isCurrentUrl } = useCurrentUrl();
                         <component :is="item.icon" v-if="item.icon" />
                         <span>{{ item.title }}</span>
                     </Link>
+                </SidebarMenuButton>
+
+                <SidebarMenuButton v-else :tooltip="item.title" class="cursor-not-allowed opacity-60">
+                    <component :is="item.icon" v-if="item.icon" />
+                    <span>{{ item.title }}</span>
                 </SidebarMenuButton>
             </SidebarMenuItem>
         </SidebarMenu>

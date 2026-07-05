@@ -6,6 +6,7 @@ type Attendance = {
     id: number;
     check_in_date: string;
     status: 'checked_in' | 'lunch_break' | 'checked_out';
+    approval_status: 'pending' | 'approved' | 'rejected' | null;
     check_in_time: string | null;
     check_out_time: string | null;
     lunch_start_time: string | null;
@@ -24,7 +25,11 @@ const today = new Date();
 
 const weekStart = new Date(today);
 weekStart.setHours(0, 0, 0, 0);
-weekStart.setDate(today.getDate() - today.getDay());
+
+const currentDay = today.getDay(); // Sunday = 0, Monday = 1
+const mondayOffset = currentDay === 0 ? -6 : 1 - currentDay;
+
+weekStart.setDate(today.getDate() + mondayOffset);
 
 const dayFormatter = new Intl.DateTimeFormat('en-US', {
     weekday: 'short',
