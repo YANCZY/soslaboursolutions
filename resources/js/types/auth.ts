@@ -14,8 +14,20 @@ export type User = {
     [key: string]: unknown;
 };
 
+export type AppNotification = {
+    id: string;
+    title: string;
+    message: string;
+    week_label?: string | null;
+    url: string;
+    created_at: string | null;
+    is_read: boolean;
+};
+
 export type Auth = {
     user: User;
+    notifications: AppNotification[];
+    unread_notifications_count: number;
 };
 
 export type TwoFactorConfigContent = {

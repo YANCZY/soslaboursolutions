@@ -266,7 +266,11 @@ const rightNavItems: NavItem[] = [
                             </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" class="w-56">
-                            <UserMenuContent :user="auth.user" />
+                            <UserMenuContent
+                                :user="auth.user"
+                                :notifications="auth.notifications"
+                                :unread-count="auth.unread_notifications_count"
+                            />
                         </DropdownMenuContent>
                     </DropdownMenu>
                 </div>

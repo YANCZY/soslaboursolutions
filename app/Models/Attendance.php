@@ -15,6 +15,8 @@ class Attendance extends Model
         'employee_id',
         'client_id',
         'status',
+        'approval_status',
+        'submitted_for_approval_at',
         'check_in_time',
         'check_out_time',
         'lunch_start_time',
@@ -26,6 +28,7 @@ class Attendance extends Model
     {
         return [
             'check_in_date' => 'date:Y-m-d',
+            'submitted_for_approval_at' => 'datetime',
             'total_working_seconds' => 'integer',
         ];
     }

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ChevronLeft, ChevronRight, Info, Pencil, Search, Trash2 } from 'lucide-vue-next';
 import { computed, ref, watch } from 'vue';
+import { toast } from 'vue-sonner';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
@@ -56,6 +57,7 @@ type Attendance = {
     lunch_start_time: string | null;
     lunch_end_time: string | null;
     total_working_seconds: number | null;
+    approval_status?: 'pending' | 'approved' | 'rejected' | null;
     user?: AttendanceUser | null;
     client?: AttendanceCompany | null;
 };
@@ -95,7 +97,9 @@ const emit = defineEmits<{
 
 const editDialogOpen = ref(false);
 const deleteDialogOpen = ref(false);
+const submitApprovalDialogOpen = ref(false);
 const selectedRecord = ref<Attendance | null>(null);
+const selectedWeekRecords = ref<Attendance[]>([]);
 const formError = ref('');
 
 const editForm = ref({
@@ -110,10 +114,6 @@ const search = ref('');
 const rowsPerPage = ref('10');
 const currentPage = ref(1);
 const selectedAttendanceIds = ref<number[]>([]);
-
-const hasSelectedAttendance = computed(() => {
-    return selectedAttendanceIds.value.length > 0;
-});
 
 const isAttendanceSelected = (attendanceId: number) => {
     return selectedAttendanceIds.value.includes(attendanceId);
@@ -179,6 +179,41 @@ const toggleGroupSelection = (
     );
 };
 
+const openSubmitApprovalDialog = (records: Attendance[]) => {
+    selectedWeekRecords.value = records;
+    submitApprovalDialogOpen.value = true;
+};
+
+const submitGroupForApproval = async () => {
+    const response = await fetch('/attendance/submit-for-approval', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {
+            Accept: 'application/json',
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-CSRF-TOKEN':
+                document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ?? '',
+        },
+        body: JSON.stringify({
+            attendance_ids: selectedWeekRecords.value.map((record) => record.id),
+        }),
+    });
+
+    const data = await response.json().catch(() => null);
+
+    if (!response.ok) {
+        toast.error(data?.message ?? 'Unable to submit timesheet for approval.');
+
+        return;
+    }
+
+    submitApprovalDialogOpen.value = false;
+    selectedWeekRecords.value = [];
+    toast.success('Timesheet has been sent for approval.');
+    emit('attendance-updated');
+};
+
 const formatUserName = (user?: AttendanceUser | null) => {
     if (!user) {
         return '-';
@@ -193,6 +228,81 @@ const formatDate = (date: string) => {
         day: '2-digit',
         year: 'numeric',
     }).format(new Date(`${date}T00:00:00`));
+};
+
+const startOfWeek = (date: string) => {
+    const value = new Date(`${date}T00:00:00`);
+    const day = value.getDay(); // Sunday = 0, Monday = 1
+    const diff = day === 0 ? -6 : 1 - day;
+
+    value.setDate(value.getDate() + diff);
+
+    return value;
+};
+
+const formatWeekRange = (date: string) => {
+    const monday = startOfWeek(date);
+    const sunday = new Date(monday);
+
+    sunday.setDate(monday.getDate() + 6);
+
+    const monthLabel = monday.toLocaleDateString('en-US', {
+        month: 'short',
+    });
+
+    const startDay = monday.toLocaleDateString('en-US', {
+        day: '2-digit',
+    });
+
+    const endDay = sunday.toLocaleDateString('en-US', {
+        day: '2-digit',
+    });
+
+    const yearLabel = sunday.toLocaleDateString('en-US', {
+        year: 'numeric',
+    });
+
+    return `${monthLabel} ${startDay} - ${monthLabel} ${endDay} ${yearLabel}`;
+};
+
+const formatApprovalStatus = (status?: string | null) => {
+    if (!status) {
+        return '-';
+    }
+
+    if (status === 'pending') {
+        return 'Pending';
+    }
+
+    if (status === 'approved') {
+        return 'Approved';
+    }
+
+    if (status === 'rejected') {
+        return 'Rejected';
+    }
+
+    return '-';
+};
+
+const isApprovalLocked = (status?: string | null) => {
+    return status === 'pending' || status === 'approved' || status === 'rejected';
+};
+
+const approvalStatusClass = (status?: string | null) => {
+    if (status === 'pending') {
+        return 'border-orange-200 bg-orange-50 text-orange-700 dark:border-orange-900/50 dark:bg-orange-950/30 dark:text-orange-300';
+    }
+
+    if (status === 'approved') {
+        return 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/50 dark:bg-emerald-950/30 dark:text-emerald-300';
+    }
+
+    if (status === 'rejected') {
+        return 'border-red-200 bg-red-50 text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300';
+    }
+
+    return 'border-border bg-muted/40 text-muted-foreground';
 };
 
 const formatTime = (time: string | null) => {
@@ -555,20 +665,29 @@ watch([search, rowsPerPage], () => {
 
 
 const groupedAttendanceRecords = computed(() => {
-    const groups = new Map<string, Attendance[]>();
+    const groups = new Map<
+        string,
+        {
+            weekStart: string;
+            records: Attendance[];
+        }
+    >();
 
     for (const record of paginatedAttendanceRecords.value) {
-        if (!groups.has(record.check_in_date)) {
-            groups.set(record.check_in_date, []);
+        const monday = startOfWeek(record.check_in_date);
+        const weekStart = monday.toISOString().slice(0, 10);
+
+        if (!groups.has(weekStart)) {
+            groups.set(weekStart, {
+                weekStart,
+                records: [],
+            });
         }
 
-        groups.get(record.check_in_date)?.push(record);
+        groups.get(weekStart)?.records.push(record);
     }
 
-    return Array.from(groups, ([date, records]) => ({
-        date,
-        records,
-    }));
+    return Array.from(groups.values());
 });
 
 const visibleTableRowCount = computed(() => {
@@ -581,20 +700,12 @@ const visibleTableRowCount = computed(() => {
 </script>
 
 <template>
-    <div class="mx-auto w-[96%] space-y-3">
+    <div class="w-full space-y-3 px-4 pt-3">
         <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div class="flex flex-wrap items-center gap-3">
                 <h2 class="text-lg font-semibold tracking-tight">
                     Attendance
                 </h2>
-
-                <Button
-                    v-if="hasSelectedAttendance"
-                    type="button"
-                    size="sm"
-                >
-                    Send Timesheet For Approval
-                </Button>
             </div>
 
             <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -611,7 +722,7 @@ const visibleTableRowCount = computed(() => {
                 </Select>
 
                 <div
-                    class="relative w-44 transition-[width] duration-200 ease-in-out hover:w-64 focus-within:w-64"
+class="relative w-full sm:w-56 lg:w-72"
                 >
                     <Search
                         class="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground"
@@ -628,47 +739,54 @@ const visibleTableRowCount = computed(() => {
 
         <div class="overflow-hidden rounded-md border border-border bg-card">
             <div
-                class="overflow-x-auto"
+class="overflow-x-auto overscroll-x-contain"
                 :class="visibleTableRowCount > 7 ? 'max-h-[30rem] overflow-y-auto' : ''"
             >
-                <table class="w-full text-sm">
+                <table class="w-max min-w-full text-sm">
                     <thead class="sticky top-0 z-10 bg-muted text-left text-muted-foreground">
                         <tr>
                             <th class="w-12 px-4 py-3"><span class="sr-only">Select attendance</span></th>
-                            <th class="px-4 py-3 font-weight-bold">Name</th>
-                            <th class="px-4 py-3 font-weight-bold">Company</th>
-                            <th class="px-4 py-3 font-weight-bold">Date</th>
-                            <th class="px-4 py-3 font-weight-bold">Check In</th>
-                            <th class="px-4 py-3 font-weight-bold">Check Out</th>
-                            <th class="px-4 py-3 font-weight-bold">Total Work Hours</th>
-                            <th class="px-4 py-3 font-weight-bold">Total Lunch Break</th>
-                            <th class="px-4 py-3 font-weight-bold">Total Overtime</th>
-                            <th class="px-4 py-3 text-right font-weight-bold">Actions</th>
+                            <th class="min-w-[160px] px-4 py-3 font-weight-bold">Name</th>
+                            <th class="min-w-[190px] px-4 py-3 font-weight-bold">Company</th>
+                            <th class="min-w-[130px] px-4 py-3 font-weight-bold">Date</th>
+                            <th class="min-w-[140px] px-4 py-3 font-weight-bold">Check In</th>
+                            <th class="min-w-[140px] px-4 py-3 font-weight-bold">Check Out</th>
+                            <th class="min-w-[160px] px-4 py-3 font-weight-bold">Total Work Hours</th>
+                            <th class="min-w-[160px] px-4 py-3 font-weight-bold">Total Lunch Break</th>
+                            <th class="min-w-[150px] px-4 py-3 font-weight-bold">Total Overtime</th>
+                            <th class="min-w-[120px] px-4 py-3 font-weight-bold">Status</th>
+                            <th class="min-w-[110px] px-4 py-3 text-right font-weight-bold">Actions</th>
                         </tr>
                     </thead>
 
                     <tbody>
                         <template
                             v-for="group in groupedAttendanceRecords"
-                            :key="group.date"
+:key="group.weekStart"
                         >
                             <tr class="border-t border-border bg-muted/30">
                                 <td class="w-12 px-4 py-2">
                                     <Checkbox
-                                        :id="`attendance-group-${group.date}`"
+:id="`attendance-group-${group.weekStart}`"
                                         :model-value="groupSelectionState(group.records)"
-                                        :aria-label="`Select all attendance for ${formatDate(group.date)}`"
+                                        :aria-label="`Select all attendance for week of ${formatWeekRange(group.weekStart)}`"
                                         @update:model-value="
                                             toggleGroupSelection(group.records, $event)
                                         "
                                     />
                                 </td>
 
-                                <td
-                                    colspan="9"
-                                    class="px-4 py-2 text-sm font-semibold"
-                                >
-                                    {{ formatDate(group.date) }}
+                                <td colspan="10" class="px-4 py-2">
+                                    <div class="flex items-center gap-2">
+                                        <span class="text-sm font-semibold">
+                                            {{ formatWeekRange(group.weekStart) }}
+                                        </span>
+
+                                        <Button v-if="groupSelectionState(group.records) === true" type="button"
+                                            size="sm" @click="openSubmitApprovalDialog(group.records)">
+                                            Submit For Approval
+                                        </Button>
+                                    </div>
                                 </td>
                             </tr>
 
@@ -687,10 +805,10 @@ const visibleTableRowCount = computed(() => {
                                         "
                                     />
                                 </td>
-                                <td class="px-4 py-3 font-medium">
+                                <td class="px-4 py-3 font-medium whitespace-nowrap">
                                     {{ formatUserName(record.user) }}
                                 </td>
-                                <td class="px-4 py-3">
+                                <td class="px-4 py-3 whitespace-nowrap">
                                     <div class="flex items-center gap-2">
                                         <TooltipProvider :delay-duration="100">
                                             <Tooltip>
@@ -722,10 +840,10 @@ const visibleTableRowCount = computed(() => {
                                         <span>{{ formatCompanyName(record) }}</span>
                                     </div>
                                 </td>
-                                <td class="px-4 py-3">
+                                <td class="px-4 py-3 whitespace-nowrap">
                                     {{ formatDate(record.check_in_date) }}
                                 </td>
-                                <td class="px-4 py-3">
+                                <td class="px-4 py-3 whitespace-nowrap">
                                     <div class="flex flex-wrap items-center gap-2">
                                         <span>{{ formatTime(record.check_in_time) }}</span>
 
@@ -742,13 +860,13 @@ const visibleTableRowCount = computed(() => {
                                         </span>
                                     </div>
                                 </td>
-                                <td class="px-4 py-3">
+                                <td class="px-4 py-3 whitespace-nowrap">
                                     {{ formatTime(record.check_out_time) }}
                                 </td>
-                                <td class="px-4 py-3">
+                                <td class="px-4 py-3 whitespace-nowrap">
                                     {{ formatDuration(totalWorkSeconds(record)) }}
                                 </td>
-                                <td class="px-4 py-3">
+                                <td class="px-4 py-3 whitespace-nowrap">
                                     <TooltipProvider :delay-duration="100">
                                         <Tooltip>
                                             <TooltipTrigger as-child>
@@ -779,7 +897,7 @@ const visibleTableRowCount = computed(() => {
                                         </Tooltip>
                                     </TooltipProvider>
                                 </td>
-                                <td class="px-4 py-3">
+                                <td class="px-4 py-3 whitespace-nowrap">
                                     <TooltipProvider :delay-duration="100">
                                         <Tooltip>
                                             <TooltipTrigger as-child>
@@ -810,13 +928,21 @@ const visibleTableRowCount = computed(() => {
                                         </Tooltip>
                                     </TooltipProvider>
                                 </td>
-                                <td class="px-4 py-3">
+                                <td class="px-4 py-3 whitespace-nowrap">
+                                    <span
+                                        class="inline-flex items-center rounded-md border px-2 py-1 text-xs font-medium"
+                                        :class="approvalStatusClass(record.approval_status)">
+                                        {{ formatApprovalStatus(record.approval_status) }}
+                                    </span>
+                                </td>
+                                <td class="px-4 py-3 whitespace-nowrap">
                                     <div class="flex justify-end gap-1">
                                         <Button
                                             type="button"
                                             variant="ghost"
                                             size="icon-sm"
                                             aria-label="Edit attendance"
+                                            :disabled="isApprovalLocked(record.approval_status)"
                                             @click="openEditDialog(record)"
                                         >
                                             <Pencil class="size-4" />
@@ -826,8 +952,9 @@ const visibleTableRowCount = computed(() => {
                                             type="button"
                                             variant="ghost"
                                             size="icon-sm"
-                                            class="text-destructive hover:text-destructive"
+                                            class="text-destructive hover:text-destructive disabled:text-muted-foreground"
                                             aria-label="Delete attendance"
+                                            :disabled="isApprovalLocked(record.approval_status)"
                                             @click="openDeleteDialog(record)"
                                         >
                                             <Trash2 class="size-4" />
@@ -839,7 +966,7 @@ const visibleTableRowCount = computed(() => {
 
                         <tr v-if="filteredAttendanceRecords.length === 0">
                             <td
-                                colspan="10"
+colspan="11"
                                 class="px-4 py-8 text-center text-muted-foreground"
                             >
                                 No attendance records found.
@@ -894,6 +1021,7 @@ const visibleTableRowCount = computed(() => {
             @update:form="editForm = $event"
             @save="saveAttendance"
         />
+        <!-- ========================== Delete Dialog-->
         <Dialog v-model:open="deleteDialogOpen">
             <DialogContent class="w-full max-w-[calc(100%-2rem)] sm:max-w-md">
                 <DialogHeader>
@@ -913,6 +1041,27 @@ const visibleTableRowCount = computed(() => {
                     </Button>
 
                     <Button type="button" variant="outline" @click="deleteDialogOpen = false">
+                        Cancel
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+        <!-- Timesheet For Approval Dialog -->
+        <Dialog v-model:open="submitApprovalDialogOpen">
+            <DialogContent class="w-full max-w-[calc(100%-2rem)] sm:max-w-md">
+                <DialogHeader>
+                    <DialogTitle>Send Timesheet For Approval</DialogTitle>
+                    <DialogDescription>
+                        Please make sure your timesheets are correct before sending them for approval.
+                    </DialogDescription>
+                </DialogHeader>
+
+                <DialogFooter>
+                    <Button type="button" @click="submitGroupForApproval">
+                        Confirm
+                    </Button>
+
+                    <Button type="button" variant="outline" @click="submitApprovalDialogOpen = false">
                         Cancel
                     </Button>
                 </DialogFooter>

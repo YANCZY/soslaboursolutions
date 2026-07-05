@@ -36,14 +36,14 @@ defineOptions({
 </script>
 <template>
     <Head title="Attendance" />
-    <div class="flex h-full flex-1 flex-col gap-4 overflow-x-auto p-4">
+    <div class="flex h-full flex-1 flex-col gap-4 overflow-x-hidden p-4 sm:p-4">
         <div class="grid gap-4 xl:grid-cols-[minmax(0,24rem)_1fr]">
             <CheckInCard
                 :attendance="props.todayAttendance"
                 :companies="props.companies"
                 @attendance-updated="refreshAttendance"
             />
-            <TotalWorkingHoursCard :weekly-attendance="weeklyAttendance" />
+            <TotalWorkingHoursCard :weekly-attendance="weeklyAttendance" @attendance-updated="refreshAttendance" />
         </div>
 
         <Card>
