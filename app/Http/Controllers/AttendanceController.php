@@ -9,6 +9,8 @@ use Illuminate\Http\JsonResponse;
 use Inertia\Inertia;
 use Inertia\Response;
 use Illuminate\Validation\Rule;
+use App\Models\User;
+use App\Notifications\TimesheetSubmittedForApprovalNotification;
 
 class AttendanceController extends Controller
 {
@@ -40,8 +42,8 @@ class AttendanceController extends Controller
 
         $todayAttendance = $this->latestOpenAttendance($request);
 
-        $weekStart = now($this->userTimezone($request))->startOfWeek(Carbon::SUNDAY)->toDateString();
-        $weekEnd = now($this->userTimezone($request))->endOfWeek(Carbon::SATURDAY)->toDateString();
+        $weekStart = now($this->userTimezone($request))->startOfWeek(Carbon::MONDAY)->toDateString();
+        $weekEnd = now($this->userTimezone($request))->endOfWeek(Carbon::SUNDAY)->toDateString();
 
         $weeklyAttendance = Attendance::query()
             ->with([
@@ -333,6 +335,66 @@ class AttendanceController extends Controller
         ]);
     }
 
+    public function submitForApproval(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'attendance_ids' => ['required', 'array', 'min:1'],
+            'attendance_ids.*' => ['integer', 'exists:attendance,id'],
+        ]);
+
+        $records = Attendance::query()
+            ->where('employee_id', $request->user()->id)
+            ->whereIn('id', $validated['attendance_ids'])
+            ->get();
+
+        if ($records->count() !== count($validated['attendance_ids'])) {
+            abort(403, 'One or more attendance records are invalid.');
+        }
+
+        foreach ($records as $record) {
+            if (! $record->check_out_time) {
+                abort(422, 'Only checked out attendance records can be submitted for approval.');
+            }
+
+            if ($record->approval_status === 'pending') {
+                abort(422, 'One or more attendance records are already pending approval.');
+            }
+        }
+
+        Attendance::query()
+            ->whereIn('id', $records->pluck('id'))
+            ->update([
+                'approval_status' => 'pending',
+                'submitted_for_approval_at' => now(),
+            ]);
+
+        $submittedBy = trim(
+            collect([
+                $request->user()->first_name,
+                $request->user()->last_name,
+            ])->filter()->implode(' ')
+        );
+
+        $weekLabel = $this->formatWeekLabelFromAttendance($records);
+
+        $approvers = $this->approverUsers();
+
+        $notification = new TimesheetSubmittedForApprovalNotification(
+            submittedBy: $submittedBy,
+            weekLabel: $weekLabel,
+            url: route('for-approvals.index'),
+        );
+
+        foreach ($approvers as $approver) {
+            $approver->notify($notification);
+        }
+
+        return response()->json([
+            'message' => 'Attendance submitted for approval successfully.',
+        ]);
+    }
+
+
     public function destroyAttendance(Request $request, Attendance $attendance): JsonResponse
     {
         abort_unless($attendance->employee_id === $request->user()->id, 403);
@@ -369,6 +431,32 @@ class AttendanceController extends Controller
             ->latest('check_in_date')
             ->latest('check_in_time')
             ->first();
+    }
+
+    private function approverUsers()
+    {
+        return User::query()
+            ->with('userType:id,user_type_name')
+            ->whereHas('userType', function ($query) {
+                $query->whereIn('user_type_name', ['Superadmin', 'SOS Admin']);
+            })
+            ->get();
+    }
+
+    private function formatWeekLabelFromAttendance($records): string
+    {
+        $firstRecord = $records->sortBy('check_in_date')->first();
+
+        if (! $firstRecord || ! $firstRecord->check_in_date) {
+            return now()->startOfWeek(Carbon::MONDAY)->format('M d')
+                . ' - '
+                . now()->endOfWeek(Carbon::SUNDAY)->format('M d Y');
+        }
+
+        $weekStart = Carbon::parse($firstRecord->check_in_date)->startOfWeek(Carbon::MONDAY);
+        $weekEnd = Carbon::parse($firstRecord->check_in_date)->endOfWeek(Carbon::SUNDAY);
+
+        return $weekStart->format('M d') . ' - ' . $weekEnd->format('M d Y');
     }
 
     /**
