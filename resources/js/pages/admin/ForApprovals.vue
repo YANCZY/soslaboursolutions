@@ -14,10 +14,14 @@ type ApprovalRecord = {
     check_out: string | null;
     total_work_hours: number;
     total_overtime: number;
+    approval_status: 'pending' | 'approved' | 'rejected';
 };
 
 defineProps<{
     approvalRecords: ApprovalRecord[];
+    filters: {
+        status: 'pending' | 'approved' | 'rejected';
+    };
 }>();
 
 defineOptions({
@@ -35,6 +39,6 @@ defineOptions({
     <Head title="For Approvals" />
 
     <div class="absolute inset-x-0 top-16 bottom-0 flex min-h-0 flex-col overflow-hidden p-4">
-        <ForApprovalListView :approval-records="approvalRecords" />
+        <ForApprovalListView :approval-records="approvalRecords" :filters="filters" />
     </div>
 </template>

@@ -46,6 +46,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // For Approvals
     Route::get('for-approvals', [ForApprovalController::class, 'index'])
         ->name('for-approvals.index');
+    Route::patch('for-approvals/{attendance}/approve', [ForApprovalController::class, 'approve'])
+    ->name('for-approvals.approve');
+    Route::patch('for-approvals/{attendance}/reject', [ForApprovalController::class, 'reject'])
+    ->name('for-approvals.reject');
     // Notifications
     Route::post('notifications/{notification}/open', [NotificationController::class, 'open'])->name('notifications.open');
 });
