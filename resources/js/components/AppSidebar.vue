@@ -45,7 +45,7 @@ const workspaceItems: NavItem[] = [
     },
     {
         title: 'Travel Allowance',
-        disabled: true,
+         href: '/travel-allowance',
         icon: Wallet
     },
     {

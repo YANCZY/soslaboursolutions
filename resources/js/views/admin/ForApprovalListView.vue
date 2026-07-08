@@ -1,11 +1,26 @@
 <script setup lang="ts">
+import { router } from '@inertiajs/vue3';
 import { Check, Filter, Search, X } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
+import { toast } from 'vue-sonner';
+
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 
-type ApprovalRecord = {
+const csrfToken = () =>
+    document
+        .querySelector('meta[name="csrf-token"]')
+        ?.getAttribute('content') ?? '';
+
+type AttendanceApprovalRecord = {
     id: number;
     date: string;
     name: string;
@@ -14,13 +29,30 @@ type ApprovalRecord = {
     check_out: string | null;
     total_work_hours: number;
     total_overtime: number;
+    approval_status: 'pending' | 'approved' | 'rejected' | null;
+};
+
+type TravelAllowanceApprovalRecord = {
+    id: number;
+    date: string;
+    name: string;
+    company: string;
+    description: string;
+    rate: number;
+    quantity: number;
+    amount: number;
+    approval_status: 'pending' | 'approved' | 'rejected' | null;
 };
 
 const props = defineProps<{
-    approvalRecords: ApprovalRecord[];
+    attendanceApprovalRecords: AttendanceApprovalRecord[];
+    travelAllowanceApprovalRecords: TravelAllowanceApprovalRecord[];
 }>();
 
 const search = ref('');
+const selectedApprovalType = ref<'attendance' | 'travel-allowance'>('attendance');
+const showStatusFilter = ref(false);
+const selectedStatus = ref<'all' | 'pending' | 'approved' | 'rejected'>('all');
 
 const formatTime = (time: string | null) => {
     if (!time) {
@@ -36,6 +68,18 @@ const formatTime = (time: string | null) => {
         });
 };
 
+const formatDate = (value: string) => {
+    return new Intl.DateTimeFormat('en-US', {
+        month: 'short',
+        day: '2-digit',
+        year: 'numeric',
+    }).format(new Date(`${value}T00:00:00`));
+};
+
+const isActionLocked = (status?: string | null) => {
+    return status === 'approved' || status === 'rejected';
+};
+
 const formatDuration = (seconds: number) => {
     if (!seconds || seconds <= 0) {
         return '-';
@@ -47,27 +91,185 @@ const formatDuration = (seconds: number) => {
     return `${hours}h ${minutes}m`;
 };
 
+const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat('en-AU', {
+        style: 'currency',
+        currency: 'AUD',
+    }).format(value);
+};
 
-const filteredApprovalRecords = computed(() => {
-    const value = search.value.trim().toLowerCase();
-
-    if (!value) {
-        return props.approvalRecords;
+const formatApprovalStatus = (status?: string | null) => {
+    if (status === 'pending') {
+        return 'Pending';
     }
 
-    return props.approvalRecords.filter((record) =>
-        Object.values(record).some((field) =>
-            String(field).toLowerCase().includes(value),
-        ),
-    );
+    if (status === 'approved') {
+        return 'Approved';
+    }
+
+    if (status === 'rejected') {
+        return 'Rejected';
+    }
+
+    return '-';
+};
+
+const approvalStatusClass = (status?: string | null) => {
+    if (status === 'pending') {
+        return 'border-orange-200 bg-orange-50 text-orange-700 dark:border-orange-900/50 dark:bg-orange-950/30 dark:text-orange-300';
+    }
+
+    if (status === 'approved') {
+        return 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/50 dark:bg-emerald-950/30 dark:text-emerald-300';
+    }
+
+    if (status === 'rejected') {
+        return 'border-red-200 bg-red-50 text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300';
+    }
+
+    return 'border-border bg-muted/40 text-muted-foreground';
+};
+
+const filteredAttendanceApprovalRecords = computed(() => {
+    const value = search.value.trim().toLowerCase();
+
+    return props.attendanceApprovalRecords.filter((record) => {
+        const matchesSearch =
+            !value ||
+            Object.values(record).some((field) =>
+                String(field).toLowerCase().includes(value),
+            );
+
+        const matchesStatus =
+            selectedStatus.value === 'all' ||
+            record.approval_status === selectedStatus.value;
+
+        return matchesSearch && matchesStatus;
+    });
 });
+
+const filteredTravelAllowanceApprovalRecords = computed(() => {
+    const value = search.value.trim().toLowerCase();
+
+    return props.travelAllowanceApprovalRecords.filter((record) => {
+        const fields = [
+            formatDate(record.date),
+            record.name,
+            record.company,
+            record.description,
+            formatCurrency(record.rate),
+            String(record.quantity),
+            formatCurrency(record.amount),
+            formatApprovalStatus(record.approval_status),
+        ];
+
+        const matchesSearch =
+            !value ||
+            fields.some((field) =>
+                String(field).toLowerCase().includes(value),
+            );
+
+        const matchesStatus =
+            selectedStatus.value === 'all' ||
+            record.approval_status === selectedStatus.value;
+
+        return matchesSearch && matchesStatus;
+    });
+});
+
+const visibleApprovalCount = computed(() =>
+    selectedApprovalType.value === 'attendance'
+        ? filteredAttendanceApprovalRecords.value.length
+        : filteredTravelAllowanceApprovalRecords.value.length,
+);
+
+const refreshApprovalRecords = (successMessage: string) => {
+    router.reload({
+        only: ['attendanceApprovalRecords', 'travelAllowanceApprovalRecords'],
+        preserveScroll: true,
+        onSuccess: () => {
+            toast.success(successMessage);
+        },
+    });
+};
+
+const approveRecord = async (id: number) => {
+    try {
+        const isAttendance = selectedApprovalType.value === 'attendance';
+
+        const url = isAttendance
+            ? `/attendance/${id}/approve`
+            : `/travel-allowance/${id}/approve`;
+
+        const response = await fetch(url, {
+            method: 'PATCH',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': csrfToken(),
+                'X-Requested-With': 'XMLHttpRequest',
+                Accept: 'application/json',
+            },
+            body: JSON.stringify({}),
+        });
+
+        if (!response.ok) {
+            const error = await response.text();
+
+            throw new Error(error || 'Failed to approve record.');
+        }
+
+        const successMessage = isAttendance
+            ? 'You approved Attendance.'
+            : 'You approved Travel Allowance.';
+
+        refreshApprovalRecords(successMessage);
+    } catch (error) {
+        console.error(error);
+        toast.error('Unable to approve record.');
+    }
+};
+
+const rejectRecord = async (id: number) => {
+    try {
+        const isAttendance = selectedApprovalType.value === 'attendance';
+
+        const url = isAttendance
+            ? `/attendance/${id}/reject`
+            : `/travel-allowance/${id}/reject`;
+
+        const response = await fetch(url, {
+            method: 'PATCH',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': csrfToken(),
+                'X-Requested-With': 'XMLHttpRequest',
+                Accept: 'application/json',
+            },
+            body: JSON.stringify({}),
+        });
+
+        if (!response.ok) {
+            const error = await response.text();
+
+            throw new Error(error || 'Failed to reject record.');
+        }
+
+        const successMessage = isAttendance
+            ? 'You rejected Attendance.'
+            : 'You rejected Travel Allowance.';
+
+        refreshApprovalRecords(successMessage);
+    } catch (error) {
+        console.error(error);
+        toast.error('Unable to reject record.');
+    }
+};
 </script>
 
 <template>
     <div class="flex min-h-0 flex-1 flex-col gap-4">
         <div class="flex shrink-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-
-            <div class="flex items-center gap-2">
+            <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
                 <div class="relative w-full sm:w-64">
                     <Search class="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
 
@@ -79,9 +281,43 @@ const filteredApprovalRecords = computed(() => {
                     />
                 </div>
 
-                <Button variant="outline" size="icon" title="Filter approvals">
-                    <Filter class="size-4" />
-                </Button>
+                <div class="relative">
+                    <Button variant="outline" size="icon" title="Filter approvals"
+                        @click="showStatusFilter = !showStatusFilter">
+                        <Filter class="size-4" />
+                    </Button>
+
+                    <div v-if="showStatusFilter"
+                        class="absolute top-11 left-0 z-20 w-52 rounded-md border bg-popover p-3 shadow-md">
+                        <div class="space-y-2">
+                            <p class="text-sm font-medium">Status</p>
+
+                            <Select v-model="selectedStatus">
+                                <SelectTrigger class="w-full">
+                                    <SelectValue />
+                                </SelectTrigger>
+
+                                <SelectContent>
+                                    <SelectItem value="all">All</SelectItem>
+                                    <SelectItem value="pending">Pending</SelectItem>
+                                    <SelectItem value="approved">Approved</SelectItem>
+                                    <SelectItem value="rejected">Rejected</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    </div>
+                </div>
+
+                <Select v-model="selectedApprovalType">
+                    <SelectTrigger class="h-9 w-full sm:w-[190px]">
+                        <SelectValue />
+                    </SelectTrigger>
+
+                    <SelectContent>
+                        <SelectItem value="attendance">Attendance</SelectItem>
+                        <SelectItem value="travel-allowance">Travel Allowance</SelectItem>
+                    </SelectContent>
+                </Select>
             </div>
         </div>
 
@@ -89,72 +325,136 @@ const filteredApprovalRecords = computed(() => {
             <div class="min-h-0 flex-1 overflow-auto">
                 <table class="w-full min-w-[980px] text-sm">
                     <thead class="sticky top-0 z-10 bg-muted text-left text-muted-foreground">
-                        <tr>
+                        <tr v-if="selectedApprovalType === 'attendance'">
                             <th class="px-4 py-3 font-medium">Date</th>
                             <th class="px-4 py-3 font-medium">Name</th>
                             <th class="px-4 py-3 font-medium">Company</th>
+                            <th class="px-4 py-3 text-center font-medium">Status</th>
                             <th class="px-4 py-3 font-medium">Check-In</th>
                             <th class="px-4 py-3 font-medium">Check Out</th>
                             <th class="px-4 py-3 font-medium">Total Work Hours</th>
                             <th class="px-4 py-3 font-medium">Total Overtime</th>
                             <th class="w-28 px-4 py-3 text-center font-medium">Action</th>
                         </tr>
+
+                        <tr v-else>
+                            <th class="px-4 py-3 font-medium">Date</th>
+                            <th class="px-4 py-3 font-medium">Name</th>
+                            <th class="px-4 py-3 font-medium">Company</th>
+                            <th class="px-4 py-3 font-medium">Description</th>
+                            <th class="px-4 py-3 text-center font-medium">Status</th>
+                            <th class="px-4 py-3 text-right font-medium">Quantity</th>
+                            <th class="px-4 py-3 text-right font-medium">Rate</th>
+                            <th class="px-4 py-3 text-right font-medium">Amount</th>
+                            <th class="w-28 px-4 py-3 text-center font-medium">Action</th>
+                        </tr>
                     </thead>
 
                     <tbody>
-                        <tr
-                            v-for="record in filteredApprovalRecords"
-                            :key="record.id"
-                            class="border-t border-border"
-                        >
-                            <td class="px-4 py-3">
-                                {{ record.date }}
-                            </td>
-                            <td class="px-4 py-3 font-medium">
-                                {{ record.name }}
-                            </td>
-                            <td class="px-4 py-3">
-                                {{ record.company }}
-                            </td>
-                            <td class="px-4 py-3">
-                                {{ formatTime(record.check_in) }}
-                            </td>
-                            <td class="px-4 py-3">
-                                {{ formatTime(record.check_out) }}
-                            </td>
-                            <td class="px-4 py-3">
-                                {{ formatDuration(record.total_work_hours) }}
-                            </td>
-                            <td class="px-4 py-3">
-                                {{ formatDuration(record.total_overtime) }}
-                            </td>
-                            <td class="w-28 px-4 py-3">
-                                <div class="flex justify-center gap-2">
-                                    <Button
-                                        type="button"
-                                        size="icon-sm"
-                                        aria-label="Approve record"
-                                        title="Approve"
-                                    >
-                                        <Check class="size-4" />
-                                    </Button>
+                        <template v-if="selectedApprovalType === 'attendance'">
+                            <tr
+v-for="record in filteredAttendanceApprovalRecords" :key="`attendance-${record.id}`"
+                                class="border-t border-border">
+                                <td class="px-4 py-3">
+                                    {{ formatDate(record.date) }}
+                                </td>
+                                <td class="px-4 py-3 font-medium">
+                                    {{ record.name }}
+                                </td>
+                                <td class="px-4 py-3">
+                                    {{ record.company }}
+                                </td>
+                                <td class="px-4 py-3 text-center">
+                                    <span
+                                        class="inline-flex items-center rounded-md border px-2 py-1 text-xs font-medium"
+                                        :class="approvalStatusClass(record.approval_status)">
+                                        {{ formatApprovalStatus(record.approval_status) }}
+                                    </span>
+                                </td>
+                                <td class="px-4 py-3">
+                                    {{ formatTime(record.check_in) }}
+                                </td>
+                                <td class="px-4 py-3">
+                                    {{ formatTime(record.check_out) }}
+                                </td>
+                                <td class="px-4 py-3">
+                                    {{ formatDuration(record.total_work_hours) }}
+                                </td>
+                                <td class="px-4 py-3">
+                                    {{ formatDuration(record.total_overtime) }}
+                                </td>
+                                <td class="w-28 px-4 py-3">
+                                    <div class="flex justify-center gap-2">
+                                        <Button type="button" size="icon-sm" aria-label="Approve record" title="Approve"
+                                            :disabled="isActionLocked(record.approval_status)"
+                                            @click="approveRecord(record.id)">
+                                            <Check class="size-4" />
+                                        </Button>
 
-                                    <Button
-                                        type="button"
-                                        variant="destructive"
-                                        size="icon-sm"
-                                        aria-label="Reject record"
-                                        title="Reject"
-                                    >
-                                        <X class="size-4" />
-                                    </Button>
-                                </div>
-                            </td>
-                        </tr>
+                                        <Button type="button" variant="destructive" size="icon-sm"
+                                            aria-label="Reject record" title="Reject"
+                                            :disabled="isActionLocked(record.approval_status)"
+                                            @click="rejectRecord(record.id)">
+                                            <X class="size-4" />
+                                        </Button>
+                                    </div>
+                                </td>
+                            </tr>
+                        </template>
 
-                        <tr v-if="filteredApprovalRecords.length === 0">
+                        <template v-else>
+                            <tr v-for="record in filteredTravelAllowanceApprovalRecords"
+                                :key="`travel-allowance-${record.id}`" class="border-t border-border">
+                                <td class="px-4 py-3">
+                                    {{ formatDate(record.date) }}
+                                </td>
+                                <td class="px-4 py-3 font-medium">
+                                    {{ record.name }}
+                                </td>
+                                <td class="px-4 py-3">
+                                    {{ record.company }}
+                                </td>
+                                <td class="px-4 py-3">
+                                    {{ record.description || '-' }}
+                                </td>
+                                <td class="px-4 py-3 text-center">
+                                    <span
+                                        class="inline-flex items-center rounded-md border px-2 py-1 text-xs font-medium"
+                                        :class="approvalStatusClass(record.approval_status)">
+                                        {{ formatApprovalStatus(record.approval_status) }}
+                                    </span>
+                                </td>
+                                <td class="px-4 py-3 text-right">
+                                    {{ record.quantity }}
+                                </td>
+                                <td class="px-4 py-3 text-right">
+                                    {{ formatCurrency(record.rate) }}
+                                </td>
+                                <td class="px-4 py-3 text-right">
+                                    {{ formatCurrency(record.amount) }}
+                                </td>
+                                <td class="w-28 px-4 py-3">
+                                    <div class="flex justify-center gap-2">
+                                        <Button type="button" size="icon-sm" aria-label="Approve record" title="Approve"
+                                            :disabled="isActionLocked(record.approval_status)"
+                                            @click="approveRecord(record.id)">
+                                            <Check class="size-4" />
+                                        </Button>
+
+                                        <Button type="button" variant="destructive" size="icon-sm"
+                                            aria-label="Reject record" title="Reject"
+                                            :disabled="isActionLocked(record.approval_status)"
+                                            @click="rejectRecord(record.id)">
+                                            <X class="size-4" />
+                                        </Button>
+                                    </div>
+                                </td>
+                            </tr>
+                        </template>
+
+                        <tr v-if="visibleApprovalCount === 0">
                             <td
-                                colspan="8"
+colspan="9"
                                 class="px-4 py-8 text-center text-muted-foreground"
                             >
                                 No approval records found.
@@ -166,7 +466,7 @@ const filteredApprovalRecords = computed(() => {
 
             <div class="shrink-0 border-t bg-background px-4 py-3">
                 <p class="text-sm text-muted-foreground">
-                    Showing {{ filteredApprovalRecords.length }} approval records
+                    Showing {{ visibleApprovalCount }} approval records
                 </p>
             </div>
         </div>
