@@ -120,14 +120,20 @@ const isAttendanceSelected = (attendanceId: number) => {
 };
 
 const toggleAttendanceSelection = (
-    attendanceId: number,
+    record: Attendance,
     selected: boolean | 'indeterminate',
 ) => {
+    if (!isSubmittable(record.approval_status)) {
+        toast.error(approvalLockedMessage(record.approval_status));
+
+        return;
+    }
+
     if (selected === true) {
-        if (!selectedAttendanceIds.value.includes(attendanceId)) {
+        if (!selectedAttendanceIds.value.includes(record.id)) {
             selectedAttendanceIds.value = [
                 ...selectedAttendanceIds.value,
-                attendanceId,
+                record.id,
             ];
         }
 
@@ -135,14 +141,22 @@ const toggleAttendanceSelection = (
     }
 
     selectedAttendanceIds.value = selectedAttendanceIds.value.filter(
-        (id) => id !== attendanceId,
+        (id) => id !== record.id,
     );
 };
 
 const groupSelectionState = (
     records: Attendance[],
 ): boolean | 'indeterminate' => {
-    const selectedRecordCount = records.filter((record) =>
+    const selectableRecords = records.filter((record) =>
+        isSubmittable(record.approval_status),
+    );
+
+    if (selectableRecords.length === 0) {
+        return false;
+    }
+
+    const selectedRecordCount = selectableRecords.filter((record) =>
         selectedAttendanceIds.value.includes(record.id),
     ).length;
 
@@ -150,37 +164,35 @@ const groupSelectionState = (
         return false;
     }
 
-    if (selectedRecordCount === records.length) {
+    if (selectedRecordCount === selectableRecords.length) {
         return true;
     }
 
     return 'indeterminate';
 };
 
-const toggleGroupSelection = (
-    records: Attendance[],
-    selected: boolean | 'indeterminate',
-) => {
-    const groupRecordIds = records.map((record) => record.id);
+const selectedGroupRecords = (records: Attendance[]) => {
+    return records.filter(
+        (record) =>
+            selectedAttendanceIds.value.includes(record.id) &&
+            isSubmittable(record.approval_status),
+    );
+};
 
-    if (selected === true) {
-        selectedAttendanceIds.value = Array.from(
-            new Set([
-                ...selectedAttendanceIds.value,
-                ...groupRecordIds,
-            ]),
-        );
+const hasSelectedGroupRecords = (records: Attendance[]) => {
+    return selectedGroupRecords(records).length > 0;
+};
+
+const openSubmitApprovalDialog = (records: Attendance[]) => {
+    const recordsToSubmit = selectedGroupRecords(records);
+
+    if (recordsToSubmit.length === 0) {
+        toast.error('Please select at least one attendance record to submit.');
 
         return;
     }
 
-    selectedAttendanceIds.value = selectedAttendanceIds.value.filter(
-        (id) => !groupRecordIds.includes(id),
-    );
-};
-
-const openSubmitApprovalDialog = (records: Attendance[]) => {
-    selectedWeekRecords.value = records;
+    selectedWeekRecords.value = recordsToSubmit;
     submitApprovalDialogOpen.value = true;
 };
 
@@ -287,6 +299,26 @@ const formatApprovalStatus = (status?: string | null) => {
 
 const isApprovalLocked = (status?: string | null) => {
     return status === 'pending' || status === 'approved' || status === 'rejected';
+};
+
+const isSubmittable = (status?: string | null) => {
+    return !status;
+};
+
+const approvalLockedMessage = (status?: string | null) => {
+    if (status === 'pending') {
+        return 'This attendance is already for approval.';
+    }
+
+    if (status === 'approved') {
+        return 'This attendance has already been approved.';
+    }
+
+    if (status === 'rejected') {
+        return 'This attendance has already been rejected.';
+    }
+
+    return '';
 };
 
 const approvalStatusClass = (status?: string | null) => {
@@ -762,16 +794,16 @@ class="overflow-x-auto overscroll-x-contain"
                     <tbody>
                         <template
                             v-for="group in groupedAttendanceRecords"
-:key="group.weekStart"
+                            :key="group.weekStart"
                         >
                             <tr class="border-t border-border bg-muted/30">
                                 <td class="w-12 px-4 py-2">
                                     <Checkbox
-:id="`attendance-group-${group.weekStart}`"
+                                        :id="`attendance-group-${group.weekStart}`"
                                         :model-value="groupSelectionState(group.records)"
                                         :aria-label="`Select all attendance for week of ${formatWeekRange(group.weekStart)}`"
                                         @update:model-value="
-                                            toggleGroupSelection(group.records, $event)
+                                            toggleAttendanceSelection(record, $event)
                                         "
                                     />
                                 </td>
@@ -782,8 +814,12 @@ class="overflow-x-auto overscroll-x-contain"
                                             {{ formatWeekRange(group.weekStart) }}
                                         </span>
 
-                                        <Button v-if="groupSelectionState(group.records) === true" type="button"
-                                            size="sm" @click="openSubmitApprovalDialog(group.records)">
+                                        <Button
+                                            v-if="hasSelectedGroupRecords(group.records)"
+                                            type="button"
+                                            size="sm"
+                                            @click="openSubmitApprovalDialog(group.records)"
+                                        >
                                             Submit For Approval
                                         </Button>
                                     </div>
@@ -801,7 +837,7 @@ class="overflow-x-auto overscroll-x-contain"
                                         :model-value="isAttendanceSelected(record.id)"
                                         :aria-label="`Select attendance record for ${formatUserName(record.user)}`"
                                         @update:model-value="
-                                            toggleAttendanceSelection(record.id, $event)
+                                            toggleAttendanceSelection(record, $event)
                                         "
                                     />
                                 </td>
