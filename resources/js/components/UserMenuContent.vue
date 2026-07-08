@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Link, router } from '@inertiajs/vue3';
 import { Bell, LogOut, Settings } from 'lucide-vue-next';
+
 import {
     DropdownMenuGroup,
     DropdownMenuItem,
@@ -8,6 +9,8 @@ import {
     DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
 import UserInfo from '@/components/UserInfo.vue';
+import { logout } from '@/routes';
+import { open as openNotification } from '@/routes/notifications';
 import type { User } from '@/types';
 import type { AppNotification } from '@/types/auth';
 
@@ -70,7 +73,7 @@ defineProps<Props>();
                 class="cursor-pointer items-start"
             >
                 <Link
-                    :href="route('notifications.open', notification.id)"
+                    :href="openNotification(notification.id)"
                     method="post"
                     as="button"
                     class="flex w-full items-start gap-3 rounded-md px-2 py-2 text-left"
@@ -107,7 +110,7 @@ defineProps<Props>();
     <DropdownMenuItem :as-child="true">
         <Link
             class="block w-full cursor-pointer"
-            href="/logout"
+            :href="logout()"
             method="post"
             @click="handleLogout"
             as="button"
