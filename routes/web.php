@@ -7,6 +7,7 @@ use App\Http\Controllers\AttendanceController;
 use App\Http\Controllers\Admin\ClientController;
 use App\Http\Controllers\Admin\ForApprovalController;
 use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\TravelAllowance\TravelAllowanceController;
 
 // Route::inertia('/', 'auth/Login', [
 //     'canRegister' => Features::enabled(Features::registration()),
@@ -46,6 +47,27 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // For Approvals
     Route::get('for-approvals', [ForApprovalController::class, 'index'])
         ->name('for-approvals.index');
+    Route::patch('attendance/{attendance}/approve', [AttendanceController::class, 'approve'])
+    ->name('attendance.approve');
+    Route::patch('attendance/{attendance}/reject', [AttendanceController::class, 'reject'])
+        ->name('attendance.reject');
+    Route::patch('travel-allowance/{travelAllowance}/approve', [TravelAllowanceController::class, 'approve'])
+    ->name('travel-allowance.approve');
+
+    Route::patch('travel-allowance/{travelAllowance}/reject', [TravelAllowanceController::class, 'reject'])
+    ->name('travel-allowance.reject');
+    // Travel Allowance
+    Route::get('travel-allowance', [TravelAllowanceController::class, 'index'])
+    ->name('travel-allowance.index');
+    Route::post('travel-allowance', [TravelAllowanceController::class, 'store'])
+    ->name('travel-allowance.store');
+    Route::put('travel-allowance/{travelAllowance}', [TravelAllowanceController::class, 'update'])
+    ->name('travel-allowance.update');
+    Route::delete('travel-allowance/{travelAllowance}', [TravelAllowanceController::class, 'destroy'])
+    ->name('travel-allowance.destroy');
+    Route::post('travel-allowance/submit-for-approval', [TravelAllowanceController::class, 'submitForApproval'])
+    ->name('travel-allowance.submit-for-approval');
+
     // Notifications
     Route::post('notifications/{notification}/open', [NotificationController::class, 'open'])->name('notifications.open');
 });

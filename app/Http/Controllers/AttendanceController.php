@@ -359,6 +359,14 @@ class AttendanceController extends Controller
             if ($record->approval_status === 'pending') {
                 abort(422, 'One or more attendance records are already pending approval.');
             }
+
+            if ($record->approval_status === 'approved') {
+                abort(422, 'One or more attendance records have already been approved.');
+            }
+
+            if ($record->approval_status === 'rejected') {
+                abort(422, 'One or more attendance records have already been rejected.');
+            }
         }
 
         Attendance::query()
@@ -391,6 +399,36 @@ class AttendanceController extends Controller
 
         return response()->json([
             'message' => 'Attendance submitted for approval successfully.',
+        ]);
+    }
+
+    public function approve(Request $request, Attendance $attendance): JsonResponse
+    {
+        if ($attendance->approval_status !== 'pending') {
+            abort(422, 'Only pending attendance records can be approved.');
+        }
+
+        $attendance->update([
+            'approval_status' => 'approved',
+        ]);
+
+        return response()->json([
+            'message' => 'Attendance approved successfully.',
+        ]);
+    }
+
+    public function reject(Request $request, Attendance $attendance): JsonResponse
+    {
+        if ($attendance->approval_status !== 'pending') {
+            abort(422, 'Only pending attendance records can be rejected.');
+        }
+
+        $attendance->update([
+            'approval_status' => 'rejected',
+        ]);
+
+        return response()->json([
+            'message' => 'Attendance rejected successfully.',
         ]);
     }
 
