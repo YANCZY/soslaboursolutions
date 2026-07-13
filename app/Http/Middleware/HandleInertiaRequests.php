@@ -40,6 +40,7 @@ class HandleInertiaRequests extends Middleware
             'name' => config('app.name'),
             'auth' => [
                 'user' => $request->user(),
+                'user_type' => $request->user()?->userType?->user_type_name,
                 'notifications' => $request->user()
                     ? $request->user()
                         ->notifications()

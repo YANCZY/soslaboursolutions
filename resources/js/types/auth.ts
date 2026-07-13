@@ -26,6 +26,7 @@ export type AppNotification = {
 
 export type Auth = {
     user: User;
+    user_type: string | null;
     notifications: AppNotification[];
     unread_notifications_count: number;
 };

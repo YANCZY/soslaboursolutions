@@ -14,12 +14,19 @@ use App\Http\Controllers\TravelAllowance\TravelAllowanceController;
 // ])->name('home');
 
 Route::get('/', function () {
-    return Auth::check()
-        ? redirect()->route('dashboard')
-        : redirect()->route('login');
+    if (! Auth::check()) {
+        return redirect()->route('login');
+    }
+
+    if (Auth::user()->userType?->user_type_name === 'Contractor') {
+        return redirect()->route('attendance.index');
+    }
+
+    return redirect()->route('dashboard');
 })->name('home');
 
-Route::middleware(['auth', 'verified'])->group(function () {
+// SUPER ADMIN
+Route::middleware(['auth', 'verified', 'user-type:SOS Admin,Superadmin,Client Admin,Client Standard'])->group(function () {
 
     Route::get('auth/status', function () {
         return response()->json(['active' => true]);
@@ -71,6 +78,41 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Notifications
     Route::post('notifications/{notification}/open', [NotificationController::class, 'open'])->name('notifications.open');
 });
+
+
+// Contractors
+Route::middleware(['auth', 'verified', 'user-type:Contractor'])->group(function () {
+
+    Route::get('auth/status', function () {
+        return response()->json(['active' => true]);
+    })->name('auth.status');
+    // Attendance
+    Route::get('attendance', [AttendanceController::class, 'index'])->name('attendance.index');
+    Route::post('attendance/check-in', [AttendanceController::class, 'checkIn'])->name('attendance.check-in');
+    Route::post('attendance/lunch/start', [AttendanceController::class, 'startLunch'])->name('attendance.lunch.start');
+    Route::post('attendance/lunch/end', [AttendanceController::class, 'endLunch'])->name('attendance.lunch.end');
+    Route::post('attendance/check-out', [AttendanceController::class, 'checkOut'])->name('attendance.check-out');
+    Route::post('attendance/forgot-check-out', [AttendanceController::class, 'storeForgotCheckOut'])->name('attendance.forgot-check-out');
+    Route::post('attendance/submit-for-approval', [AttendanceController::class, 'submitForApproval'])
+        ->name('attendance.submit-for-approval');
+    Route::put('attendance/{attendance}', [AttendanceController::class, 'updateAttendance'])->name('attendance.update');
+    Route::delete('attendance/{attendance}', [AttendanceController::class, 'destroyAttendance'])->name('attendance.destroy');
+    // Travel Allowance
+    Route::get('travel-allowance', [TravelAllowanceController::class, 'index'])
+    ->name('travel-allowance.index');
+    Route::post('travel-allowance', [TravelAllowanceController::class, 'store'])
+    ->name('travel-allowance.store');
+    Route::put('travel-allowance/{travelAllowance}', [TravelAllowanceController::class, 'update'])
+    ->name('travel-allowance.update');
+    Route::delete('travel-allowance/{travelAllowance}', [TravelAllowanceController::class, 'destroy'])
+    ->name('travel-allowance.destroy');
+    Route::post('travel-allowance/submit-for-approval', [TravelAllowanceController::class, 'submitForApproval'])
+    ->name('travel-allowance.submit-for-approval');
+
+    // Notifications
+    Route::post('notifications/{notification}/open', [NotificationController::class, 'open'])->name('notifications.open');
+});
+
 
 
 

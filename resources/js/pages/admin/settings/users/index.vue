@@ -250,7 +250,7 @@ const saveUser = () => {
     addUserForm.client_ids = selectedCompanyIds.value;
     addUserForm.user_type_id = selectedUserTypeId.value;
 
-    addUserForm.post('/settings/users/', {
+    addUserForm.post('/settings/users', {
         preserveScroll: true,
         onSuccess: () => {
             addUserDialogOpen.value = false;
