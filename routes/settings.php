@@ -18,39 +18,43 @@ Route::middleware(['auth'])->group(function () {
 
 Route::middleware(['auth', 'verified'])->group(function () {
 
-    // Profile
-    Route::delete('settings/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+        // Profile
+        Route::delete('settings/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 
-    // Security
-    Route::get('settings/security', [SecurityController::class, 'edit'])->name('security.edit');
+        // Security
+        Route::get('settings/security', [SecurityController::class, 'edit'])->name('security.edit');
 
-    // Passowrd
-    Route::put('settings/password', [SecurityController::class, 'update'])
-        ->middleware('throttle:6,1')
-        ->name('user-password.update');
+        // Passowrd
+        Route::put('settings/password', [SecurityController::class, 'update'])
+            ->middleware('throttle:6,1')
+            ->name('user-password.update');
 
-    // Appearance
-    Route::inertia('settings/appearance', 'settings/Appearance')->name('appearance.edit');
-    // Company
-    Route::get('settings/company', [CompanySettingsController::class, 'index'])
-    ->name('settings.company.index');
+        // Appearance
+        Route::inertia('settings/appearance', 'settings/Appearance')->name('appearance.edit');
 
-    // Employee
-    Route::get('settings/employee', [EmployeeSettingsController::class, 'index'])
-    ->name('settings.employee.index');
+    // GROUP ROUTES FOR USERS WITH ALLOWED TYPES: SOS Admin, Superadmin, Client Admin, Client Standard
+    Route::middleware(['user-type:SOS Admin,Superadmin,Client Admin,Client Standard'])->group(function () {
+        // Company
+        Route::get('settings/company', [CompanySettingsController::class, 'index'])
+        ->name('settings.company.index');
 
-    Route::post('settings/employee', [EmployeeSettingsController::class, 'store'])
-        ->name('settings.employee.store');
+        // Employee
+        Route::get('settings/employee', [EmployeeSettingsController::class, 'index'])
+        ->name('settings.employee.index');
 
-    Route::patch('settings/employee/{user}/toggle-status', [EmployeeSettingsController::class, 'toggleStatus'])
-        ->name('settings.employee.toggle-status');
+        Route::post('settings/employee', [EmployeeSettingsController::class, 'store'])
+            ->name('settings.employee.store');
 
-    // Users
-    Route::get('settings/users', [UserSettingsController::class, 'index'])
-    ->name('settings.users.index');
-    Route::post('settings/users', [UserSettingsController::class, 'store'])
-    ->name('settings.users.store');
-    Route::patch('settings/users/{user}', [UserSettingsController::class, 'update'])
-        ->name('settings.users.update');
-    Route::patch('settings/users/{user}/toggle-status',[UserSettingsController::class, 'toggleStatus'])->name('settings.users.toggle-status');
+        Route::patch('settings/employee/{user}/toggle-status', [EmployeeSettingsController::class, 'toggleStatus'])
+            ->name('settings.employee.toggle-status');
+
+        // Users
+        Route::get('settings/users', [UserSettingsController::class, 'index'])
+        ->name('settings.users.index');
+        Route::post('settings/users', [UserSettingsController::class, 'store'])
+        ->name('settings.users.store');
+        Route::patch('settings/users/{user}', [UserSettingsController::class, 'update'])
+            ->name('settings.users.update');
+        Route::patch('settings/users/{user}/toggle-status',[UserSettingsController::class, 'toggleStatus'])->name('settings.users.toggle-status');
+    });
 });

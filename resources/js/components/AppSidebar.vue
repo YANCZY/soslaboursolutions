@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { Link } from '@inertiajs/vue3';
+import { Link, usePage } from '@inertiajs/vue3';
 import { Building2, Calendar1Icon, ClipboardCheck, Contact2, LayoutGrid, Wallet } from 'lucide-vue-next';
+import { computed } from 'vue';
 import AppLogo from '@/components/AppLogo.vue';
 import NavFooter from '@/components/NavFooter.vue';
 import NavMain from '@/components/NavMain.vue';
@@ -15,6 +16,9 @@ import {
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
 import type { NavItem } from '@/types';
+
+const page = usePage();
+const isContractor = computed(() => page.props.auth.user_type === 'Contractor');
 
 const mainNavItems: NavItem[] = [
     {
@@ -73,7 +77,11 @@ const workspaceItems: NavItem[] = [
         </SidebarHeader>
 
         <SidebarContent>
-            <NavMain :items="mainNavItems" :people-items="peopleItems" :workspace-items="workspaceItems" />
+            <NavMain
+                :items="isContractor ? [] : mainNavItems"
+                :people-items="isContractor ? [] : peopleItems"
+                :workspace-items="isContractor ? workspaceItems.filter((item) => ['Attendance', 'Travel Allowance'].includes(item.title)) : workspaceItems"
+            />
         </SidebarContent>
 
         <SidebarFooter>

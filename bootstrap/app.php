@@ -30,9 +30,9 @@ return Application::configure(basePath: dirname(__DIR__))
             PreventInactivePasswordReset::class,
         ]);
 
-        // $middleware->alias([
-        //     'encrypt-history' => EncryptHistory::class,
-        // ]);
+        $middleware->alias([
+            'user-type' => \App\Http\Middleware\EnsureUserHasAllowedType::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //

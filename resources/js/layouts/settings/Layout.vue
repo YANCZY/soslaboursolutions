@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { Link } from '@inertiajs/vue3';
+import { Link, usePage } from '@inertiajs/vue3';
+import { computed } from 'vue';
 import Heading from '@/components/Heading.vue';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
@@ -34,6 +35,18 @@ const sidebarNavItems: NavItem[] = [
     },
 ];
 
+const page = usePage();
+
+const visibleSidebarNavItems = computed(() => {
+    if (page.props.auth.user_type === 'Contractor') {
+        return sidebarNavItems.filter((item) =>
+            ['Profile', 'Security', 'Appearance'].includes(item.title),
+        );
+    }
+
+    return sidebarNavItems;
+});
+
 const { isCurrentOrParentUrl } = useCurrentUrl();
 </script>
 
@@ -51,7 +64,7 @@ const { isCurrentOrParentUrl } = useCurrentUrl();
                     aria-label="Settings"
                 >
                     <Button
-                        v-for="item in sidebarNavItems"
+                        v-for="item in visibleSidebarNavItems"
                         :key="toUrl(item.href)"
                         variant="ghost"
                         :class="[

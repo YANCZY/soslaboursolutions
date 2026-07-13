@@ -7,7 +7,11 @@ defineOptions({
     layout: {
         breadcrumbs: [
             {
-                title: 'Appearance settings',
+                title: 'Settings',
+                href: '/settings',
+            },
+            {
+                title: 'Appearance',
                 href: '/settings/appearance',
             },
         ],
