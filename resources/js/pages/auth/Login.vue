@@ -34,7 +34,7 @@ const redirectIfAuthenticated = async () => {
         });
 
         if (response.ok) {
-            router.visit('/dashboard', { replace: true });
+                router.visit('/', { replace: true });
         }
     } catch {
         //
