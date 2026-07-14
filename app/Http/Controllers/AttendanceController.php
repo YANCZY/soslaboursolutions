@@ -249,7 +249,7 @@ class AttendanceController extends Controller
         );
 
         if ($manualCheckOut->lessThanOrEqualTo($checkIn)) {
-            abort(422, 'Check-out time must be later than check-in time.');
+            $manualCheckOut->addDay();
         }
 
         $lunchSeconds = 0;
@@ -303,7 +303,7 @@ class AttendanceController extends Controller
         $checkOut = Carbon::parse($validated['check_in_date'].' '.$validated['check_out_time']);
 
         if ($checkOut->lessThanOrEqualTo($checkIn)) {
-            abort(422, 'Check-out time must be later than check-in time.');
+            $checkOut->addDay();
         }
 
         $lunchSeconds = 0;

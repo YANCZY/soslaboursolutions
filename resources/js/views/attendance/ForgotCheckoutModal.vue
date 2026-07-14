@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { X } from 'lucide-vue-next';
+import { computed } from 'vue';
 import InputError from '@/components/InputError.vue';
 import { Button } from '@/components/ui/button';
 import {
@@ -12,6 +13,13 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 
 type Attendance = {
     id: number;
@@ -20,7 +28,7 @@ type Attendance = {
     check_out_time: string | null;
 };
 
-defineProps<{
+const props = defineProps<{
     open: boolean;
     attendance: Attendance | null;
     checkOutTime: string;
@@ -32,6 +40,39 @@ const emit = defineEmits<{
     (e: 'update:checkOutTime', value: string): void;
     (e: 'save'): void;
 }>();
+
+const checkOutPeriod = computed({
+    get: () => {
+        if (!props.checkOutTime) {
+            return 'AM';
+        }
+
+        const [hours] = props.checkOutTime.split(':');
+
+        return Number(hours) >= 12 ? 'PM' : 'AM';
+    },
+    set: (period: string) => {
+        if (!props.checkOutTime) {
+            return;
+        }
+
+        const [hours, minutes = '00'] = props.checkOutTime.split(':');
+        let hour = Number(hours);
+
+        if (period === 'AM' && hour >= 12) {
+            hour -= 12;
+        }
+
+        if (period === 'PM' && hour < 12) {
+            hour += 12;
+        }
+
+        emit(
+            'update:checkOutTime',
+            `${String(hour).padStart(2, '0')}:${minutes}`,
+        );
+    },
+});
 
 const formatTimeToAmPm = (time: string | null) => {
     if (!time) {
@@ -94,17 +135,40 @@ const formatTimeToAmPm = (time: string | null) => {
                         />
                     </div>
 
-                    <div class="space-y-2">
-                        <Label for="forgot_logout_check_out_time">Check Out Time</Label>
-                        <Input
-                            id="forgot_logout_check_out_time"
-                            :model-value="checkOutTime"
-                            type="time"
-                            required
-                            @update:model-value="emit('update:checkOutTime', String($event ?? ''))"
-                        />
-                        <InputError :message="error" />
+                    <div class="grid gap-3 sm:grid-cols-[1fr_7rem]">
+                        <div class="space-y-2">
+                            <Label for="forgot_logout_check_out_time">Check Out Time</Label>
+                            <Input
+                                id="forgot_logout_check_out_time"
+                                :model-value="checkOutTime"
+                                type="time"
+                                required
+                                @update:model-value="emit('update:checkOutTime', String($event ?? ''))"
+                            />
+                        </div>
+
+                        <div class="space-y-2">
+                            <Label for="forgot_logout_check_out_period">AM/PM</Label>
+                            <Select
+                                id="forgot_logout_check_out_period"
+                                v-model="checkOutPeriod"
+                                :disabled="!checkOutTime"
+                            >
+                                <SelectTrigger>
+                                    <SelectValue />
+                                </SelectTrigger>
+
+                                <SelectContent>
+                                    <SelectItem value="AM">AM</SelectItem>
+                                    <SelectItem value="PM">PM</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+
+                        <InputError class="sm:col-span-2" :message="error" />
                     </div>
+
+
                 </div>
 
                 <DialogFooter class="sticky bottom-0 z-10 gap-2 border-t bg-background px-6 py-4">
