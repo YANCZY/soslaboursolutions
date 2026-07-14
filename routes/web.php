@@ -25,12 +25,13 @@ Route::get('/', function () {
     return redirect()->route('dashboard');
 })->name('home');
 
+Route::middleware(['auth', 'verified'])->get('auth/status', function () {
+    return response()->json(['active' => true]);
+})->name('auth.status');
+
 // SUPER ADMIN
 Route::middleware(['auth', 'verified', 'user-type:SOS Admin,Superadmin,Client Admin,Client Standard'])->group(function () {
 
-    Route::get('auth/status', function () {
-        return response()->json(['active' => true]);
-    })->name('auth.status');
     // HOME
     Route::inertia('dashboard', 'Dashboard')->name('dashboard');
     // Workspace Contractor
@@ -83,9 +84,6 @@ Route::middleware(['auth', 'verified', 'user-type:SOS Admin,Superadmin,Client Ad
 // Contractors
 Route::middleware(['auth', 'verified', 'user-type:Contractor'])->group(function () {
 
-    Route::get('auth/status', function () {
-        return response()->json(['active' => true]);
-    })->name('auth.status');
     // Attendance
     Route::get('attendance', [AttendanceController::class, 'index'])->name('attendance.index');
     Route::post('attendance/check-in', [AttendanceController::class, 'checkIn'])->name('attendance.check-in');
