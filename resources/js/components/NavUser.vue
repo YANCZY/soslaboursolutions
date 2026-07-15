@@ -2,6 +2,7 @@
 import { usePage } from '@inertiajs/vue3';
 import { Bell, ChevronsUpDown } from 'lucide-vue-next';
 import { computed } from 'vue';
+import NotificationMenuContent from '@/components/NotificationMenuContent.vue';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -29,7 +30,7 @@ const { isMobile, state } = useSidebar();
 
 <template>
     <SidebarMenu>
-        <SidebarMenuItem>
+        <SidebarMenuItem class="flex items-center gap-2">
             <DropdownMenu>
                 <DropdownMenuTrigger
                     type="button"
@@ -37,25 +38,13 @@ const { isMobile, state } = useSidebar();
                     data-slot="sidebar-menu-button"
                     data-size="lg"
                     data-test="sidebar-menu-button"
-                    class="peer/menu-button flex h-12 w-full items-center gap-2 overflow-hidden rounded-md p-2 text-left text-sm ring-sidebar-ring outline-hidden transition-[width,height,padding] hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 active:bg-sidebar-accent active:text-sidebar-accent-foreground data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground group-data-[collapsible=icon]:size-8! group-data-[collapsible=icon]:p-0! [&>span:last-child]:truncate [&>svg]:size-4 [&>svg]:shrink-0"
+                    class="peer/menu-button flex h-12 min-w-0 flex-1 items-center gap-2 overflow-hidden rounded-md p-2 text-left text-sm ring-sidebar-ring outline-hidden transition-[width,height,padding] hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 active:bg-sidebar-accent active:text-sidebar-accent-foreground data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground group-data-[collapsible=icon]:size-8! group-data-[collapsible=icon]:p-0! [&>span:last-child]:truncate [&>svg]:size-4 [&>svg]:shrink-0"
                 >
                     <UserInfo :user="user" />
 
-                    <span
-                        class="relative inline-flex size-8 items-center justify-center rounded-md text-sidebar-foreground/70 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                        aria-hidden="true"
-                    >
-                        <Bell class="size-4" />
-                        <span
-                            v-if="unreadNotificationsCount > 0"
-                            class="absolute -top-1 -right-1 inline-flex min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-semibold leading-none text-white"
-                        >
-                            {{ unreadNotificationsCount }}
-                        </span>
-                    </span>
-
                     <ChevronsUpDown class="ml-auto size-4" />
                 </DropdownMenuTrigger>
+
                 <DropdownMenuContent
                     class="w-(--reka-dropdown-menu-trigger-width) min-w-72 rounded-lg"
                     :side="
@@ -68,8 +57,32 @@ const { isMobile, state } = useSidebar();
                     align="end"
                     :side-offset="4"
                 >
-                    <UserMenuContent
-                        :user="user"
+                    <UserMenuContent :user="user" />
+                </DropdownMenuContent>
+            </DropdownMenu>
+
+            <DropdownMenu>
+                <DropdownMenuTrigger
+                    type="button"
+                    class="relative inline-flex size-8 shrink-0 items-center justify-center rounded-md text-sidebar-foreground/70 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                >
+                    <Bell class="size-4" />
+
+                    <span
+                        v-if="unreadNotificationsCount > 0"
+                        class="absolute -top-1 -right-1 inline-flex min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-semibold leading-none text-white"
+                    >
+                        {{ unreadNotificationsCount }}
+                    </span>
+                </DropdownMenuTrigger>
+
+                <DropdownMenuContent
+                    class="z-[100] w-96 rounded-xl"
+                    :side="isMobile ? 'bottom' : 'right'"
+                    align="end"
+                    :side-offset="8"
+                >
+                    <NotificationMenuContent
                         :notifications="notifications"
                         :unread-count="unreadNotificationsCount"
                     />

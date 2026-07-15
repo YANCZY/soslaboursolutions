@@ -11,6 +11,7 @@ use Inertia\Response;
 use Illuminate\Validation\Rule;
 use App\Models\User;
 use App\Notifications\TimesheetSubmittedForApprovalNotification;
+use App\Notifications\AttendanceApprovalStatusNotification;
 
 class AttendanceController extends Controller
 {
@@ -385,12 +386,18 @@ class AttendanceController extends Controller
 
         $weekLabel = $this->formatWeekLabelFromAttendance($records);
 
-        $approvers = $this->approverUsers();
+        $clientIds = $records
+        ->pluck('client_id')
+        ->filter()
+        ->unique()
+        ->values();
+
+        $approvers = $this->approverUsers($clientIds);
 
         $notification = new TimesheetSubmittedForApprovalNotification(
             submittedBy: $submittedBy,
             weekLabel: $weekLabel,
-            url: route('for-approvals.index'),
+            url: route('for-approvals.index', ['approval_type' => 'attendance']),
         );
 
         foreach ($approvers as $approver) {
@@ -404,6 +411,9 @@ class AttendanceController extends Controller
 
     public function approve(Request $request, Attendance $attendance): JsonResponse
     {
+
+        abort_unless($this->canApproveClient($request, $attendance->client_id), 403);
+
         if ($attendance->approval_status !== 'pending') {
             abort(422, 'Only pending attendance records can be approved.');
         }
@@ -412,6 +422,12 @@ class AttendanceController extends Controller
             'approval_status' => 'approved',
         ]);
 
+        $attendance->user?->notify(new AttendanceApprovalStatusNotification(
+            status: 'approved',
+            date: $attendance->check_in_date?->format('M d, Y') ?? '-',
+            url: route('attendance.index'),
+        ));
+
         return response()->json([
             'message' => 'Attendance approved successfully.',
         ]);
@@ -419,6 +435,9 @@ class AttendanceController extends Controller
 
     public function reject(Request $request, Attendance $attendance): JsonResponse
     {
+
+        abort_unless($this->canApproveClient($request, $attendance->client_id), 403);
+
         if ($attendance->approval_status !== 'pending') {
             abort(422, 'Only pending attendance records can be rejected.');
         }
@@ -426,6 +445,12 @@ class AttendanceController extends Controller
         $attendance->update([
             'approval_status' => 'rejected',
         ]);
+
+        $attendance->user?->notify(new AttendanceApprovalStatusNotification(
+            status: 'rejected',
+            date: $attendance->check_in_date?->format('M d, Y') ?? '-',
+            url: route('attendance.index'),
+        ));
 
         return response()->json([
             'message' => 'Attendance rejected successfully.',
@@ -471,14 +496,31 @@ class AttendanceController extends Controller
             ->first();
     }
 
-    private function approverUsers()
+    private function approverUsers($clientIds)
     {
         return User::query()
             ->with('userType:id,user_type_name')
             ->whereHas('userType', function ($query) {
-                $query->whereIn('user_type_name', ['Superadmin', 'SOS Admin']);
+                $query->where('user_type_name', 'Client Admin');
+            })
+            ->where(function ($query) use ($clientIds) {
+                $query
+                    ->whereIn('client_id', $clientIds)
+                    ->orWhereHas('clients', function ($clientQuery) use ($clientIds) {
+                        $clientQuery->whereIn('clients.id', $clientIds);
+                    });
             })
             ->get();
+    }
+
+    private function canApproveClient(Request $request, ?int $clientId): bool
+    {
+        if (! $clientId) {
+            return false;
+        }
+
+        return $request->user()->client_id === $clientId
+            || $request->user()->clients()->where('clients.id', $clientId)->exists();
     }
 
     private function formatWeekLabelFromAttendance($records): string
