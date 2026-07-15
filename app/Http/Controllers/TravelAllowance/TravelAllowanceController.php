@@ -10,7 +10,9 @@ use App\Http\Requests\StoreTravelAllowanceRequest;
 use App\Models\TravelAllowance;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\JsonResponse;
-
+use App\Notifications\TravelAllowanceSubmittedForApprovalNotification;
+use App\Models\User;
+use App\Notifications\TravelAllowanceApprovalStatusNotification;
 class TravelAllowanceController extends Controller
 {
     public function index(Request $request): Response
@@ -108,6 +110,30 @@ class TravelAllowanceController extends Controller
                 'submitted_for_approval_at' => now(),
             ]);
 
+        $submittedBy = trim(
+            collect([
+                $request->user()->first_name,
+                $request->user()->last_name,
+            ])->filter()->implode(' ')
+        );
+
+        $clientIds = $records
+            ->pluck('client_id')
+            ->filter()
+            ->unique()
+            ->values();
+
+        $approvers = $this->approverUsers($clientIds);
+
+        $notification = new TravelAllowanceSubmittedForApprovalNotification(
+            submittedBy: $submittedBy,
+            url: route('for-approvals.index', ['approval_type' => 'travel-allowance']),
+        );
+
+        foreach ($approvers as $approver) {
+            $approver->notify($notification);
+        }
+
         return response()->json([
             'message' => 'Travel allowance submitted for approval successfully.',
         ]);
@@ -115,6 +141,8 @@ class TravelAllowanceController extends Controller
 
     public function approve(Request $request, TravelAllowance $travelAllowance): JsonResponse
     {
+        abort_unless($this->canApproveClient($request, $travelAllowance->client_id), 403);
+
         if ($travelAllowance->approval_status !== 'pending') {
             abort(422, 'Only pending travel allowance records can be approved.');
         }
@@ -123,6 +151,12 @@ class TravelAllowanceController extends Controller
             'approval_status' => 'approved',
         ]);
 
+        $travelAllowance->user?->notify(new TravelAllowanceApprovalStatusNotification(
+            status: 'approved',
+            date: $travelAllowance->date,
+            url: route('travel-allowance.index'),
+        ));
+
         return response()->json([
             'message' => 'Travel allowance approved successfully.',
         ]);
@@ -130,6 +164,8 @@ class TravelAllowanceController extends Controller
 
     public function reject(Request $request, TravelAllowance $travelAllowance): JsonResponse
     {
+        abort_unless($this->canApproveClient($request, $travelAllowance->client_id), 403);
+
         if ($travelAllowance->approval_status !== 'pending') {
             abort(422, 'Only pending travel allowance records can be rejected.');
         }
@@ -137,6 +173,12 @@ class TravelAllowanceController extends Controller
         $travelAllowance->update([
             'approval_status' => 'rejected',
         ]);
+
+        $travelAllowance->user?->notify(new TravelAllowanceApprovalStatusNotification(
+            status: 'rejected',
+            date: $travelAllowance->date,
+            url: route('travel-allowance.index'),
+        ));
 
         return response()->json([
             'message' => 'Travel allowance rejected successfully.',
@@ -160,6 +202,33 @@ class TravelAllowanceController extends Controller
         ]);
 
         return to_route('travel-allowance.index');
+    }
+
+    private function approverUsers($clientIds)
+    {
+        return User::query()
+            ->with('userType:id,user_type_name')
+            ->whereHas('userType', function ($query) {
+                $query->where('user_type_name', 'Client Admin');
+            })
+            ->where(function ($query) use ($clientIds) {
+                $query
+                    ->whereIn('client_id', $clientIds)
+                    ->orWhereHas('clients', function ($clientQuery) use ($clientIds) {
+                        $clientQuery->whereIn('clients.id', $clientIds);
+                    });
+            })
+            ->get();
+    }
+
+    private function canApproveClient(Request $request, ?int $clientId): bool
+    {
+        if (! $clientId) {
+            return false;
+        }
+
+        return $request->user()->client_id === $clientId
+            || $request->user()->clients()->where('clients.id', $clientId)->exists();
     }
 
     public function destroy(Request $request, TravelAllowance $travelAllowance): RedirectResponse

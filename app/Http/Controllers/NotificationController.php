@@ -5,7 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Notifications\DatabaseNotification;
-
+use Illuminate\Http\JsonResponse;
 
 class NotificationController extends Controller
 {
@@ -24,5 +24,16 @@ class NotificationController extends Controller
         $targetUrl = data_get($notificationRecord->data, 'url', route('for-approvals.index'));
 
         return redirect()->to($targetUrl);
+    }
+
+    public function markAllAsRead(Request $request): JsonResponse
+    {
+        $request->user()
+            ->unreadNotifications()
+            ->update(['read_at' => now()]);
+
+        return response()->json([
+            'message' => 'Notifications marked as read.',
+        ]);
     }
 }

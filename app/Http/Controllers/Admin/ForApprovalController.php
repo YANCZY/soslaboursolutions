@@ -11,14 +11,23 @@ use App\Models\TravelAllowance;
 
 class ForApprovalController extends Controller
 {
-    public function index(): Response
+    public function index(Request $request): Response
     {
+        $clientIds = $request->user()
+            ->clients()
+            ->pluck('clients.id')
+            ->push($request->user()->client_id)
+            ->filter()
+            ->unique()
+            ->values();
+
         $attendanceApprovalRecords = Attendance::query()
             ->with([
                 'user:id,first_name,last_name',
                 'client:id,company_name',
             ])
             ->whereNotNull('approval_status')
+            ->whereIn('client_id', $clientIds)
             ->orderByDesc('submitted_for_approval_at')
             ->orderByDesc('check_in_date')
             ->get()
@@ -42,6 +51,7 @@ class ForApprovalController extends Controller
                     'client:id,company_name',
                 ])
                 ->whereNotNull('approval_status')
+                ->whereIn('client_id', $clientIds)
                 ->orderByDesc('submitted_for_approval_at')
                 ->orderByDesc('date')
                 ->get()
