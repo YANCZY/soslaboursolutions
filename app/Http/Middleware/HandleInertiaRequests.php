@@ -45,7 +45,7 @@ class HandleInertiaRequests extends Middleware
                     ? $request->user()
                         ->notifications()
                         ->latest()
-                        ->take(5)
+                        ->take(20)
                         ->get()
                         ->map(fn ($notification) => [
                             'id' => $notification->id,

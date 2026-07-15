@@ -24,6 +24,10 @@ defineProps<{
     canRegister: boolean;
 }>();
 
+const handleLoginSuccess = () => {
+    window.location.href = '/';
+};
+
 const redirectIfAuthenticated = async () => {
     try {
         const response = await fetch('/auth/status', {
@@ -73,6 +77,7 @@ onBeforeUnmount(() => {
         action="/login"
         method="post"
         :reset-on-success="['password']"
+        @success="handleLoginSuccess"
         v-slot="{ errors, processing }"
         class="flex flex-col gap-6"
     >

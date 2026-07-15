@@ -50,7 +50,11 @@ const props = defineProps<{
 }>();
 
 const search = ref('');
-const selectedApprovalType = ref<'attendance' | 'travel-allowance'>('attendance');
+const initialApprovalType = new URLSearchParams(window.location.search).get('approval_type');
+
+const selectedApprovalType = ref<'attendance' | 'travel-allowance'>(
+    initialApprovalType === 'travel-allowance' ? 'travel-allowance' : 'attendance',
+);
 const showStatusFilter = ref(false);
 const selectedStatus = ref<'all' | 'pending' | 'approved' | 'rejected'>('all');
 
