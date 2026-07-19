@@ -3,6 +3,7 @@ import { usePage } from '@inertiajs/vue3';
 import { AlarmClockOff, Clock, Coffee, Info } from 'lucide-vue-next';
 
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { toast } from 'vue-sonner';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -255,7 +256,7 @@ const postAttendanceAction = async (url: string, payload: Record<string, unknown
             return;
         }
 
-        alert(data?.message ?? 'Attendance request failed.');
+        toast.error(data?.message ?? 'Attendance request failed.');
 
         return;
     }

@@ -20,6 +20,16 @@ import type { NavItem } from '@/types';
 const page = usePage();
 const isContractor = computed(() => page.props.auth.user_type === 'Contractor');
 
+const userType = computed(() => page.props.auth.user_type);
+
+const canViewPeople = computed(() =>
+    ['Superadmin', 'SOS Admin', 'SOS Standard'].includes(userType.value ?? ''),
+);
+
+const canApprove = computed(() =>
+    ['Superadmin', 'SOS Admin', 'Client Admin'].includes(userType.value ?? ''),
+);
+
 const mainNavItems: NavItem[] = [
     {
         title: 'Dashboard',
@@ -79,8 +89,12 @@ const workspaceItems: NavItem[] = [
         <SidebarContent>
             <NavMain
                 :items="isContractor ? [] : mainNavItems"
-                :people-items="isContractor ? [] : peopleItems"
-                :workspace-items="isContractor ? workspaceItems.filter((item) => ['Attendance', 'Travel Allowance'].includes(item.title)) : workspaceItems"
+                :people-items="canViewPeople ? peopleItems : []"
+                :workspace-items="
+                    workspaceItems.filter((item) =>
+                        item.title !== 'For Approvals' || canApprove
+                    )
+                "
             />
         </SidebarContent>
 
