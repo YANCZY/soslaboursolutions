@@ -42,32 +42,30 @@ Route::middleware([
     'verified',
     'user-type:SOS Admin,Superadmin,Client Admin,Client Standard,Contractor',
 ])->group(function () {
+
+
+    // ATTENDANCE
     Route::get('attendance', [AttendanceController::class, 'index'])
         ->name('attendance.index');
-
     Route::post('attendance/check-in', [AttendanceController::class, 'checkIn'])
         ->name('attendance.check-in');
-
     Route::post('attendance/lunch/start', [AttendanceController::class, 'startLunch'])
         ->name('attendance.lunch.start');
-
     Route::post('attendance/lunch/end', [AttendanceController::class, 'endLunch'])
         ->name('attendance.lunch.end');
-
     Route::post('attendance/check-out', [AttendanceController::class, 'checkOut'])
         ->name('attendance.check-out');
-
     Route::post('attendance/forgot-check-out', [AttendanceController::class, 'storeForgotCheckOut'])
         ->name('attendance.forgot-check-out');
-
-    Route::post('attendance/submit-for-approval', [AttendanceController::class, 'submitForApproval'])
-        ->name('attendance.submit-for-approval');
-
     Route::put('attendance/{attendance}', [AttendanceController::class, 'updateAttendance'])
         ->name('attendance.update');
-
     Route::delete('attendance/{attendance}', [AttendanceController::class, 'destroyAttendance'])
         ->name('attendance.destroy');
+
+
+    // ATTENDANCE & TRAVEL ALLOWANCE SUBMIT FOR APPROVAL
+    Route::post('attendance/submit-for-approval', [AttendanceController::class, 'submitForApproval'])
+        ->name('attendance.submit-for-approval');
 
     Route::get('travel-allowance', [TravelAllowanceController::class, 'index'])
         ->name('travel-allowance.index');
@@ -97,16 +95,6 @@ Route::middleware(['auth', 'verified', 'user-type:SOS Admin,Superadmin,Client Ad
     Route::post('clients', [ClientController::class, 'store'])->name('clients.store');
     Route::get('clients/save-requests/{clientSaveRequest}', [ClientController::class, 'saveStatus'])->name('clients.save-status');
 
-    // Attendance
-    Route::post('attendance/check-in', [AttendanceController::class, 'checkIn'])->name('attendance.check-in');
-    Route::post('attendance/lunch/start', [AttendanceController::class, 'startLunch'])->name('attendance.lunch.start');
-    Route::post('attendance/lunch/end', [AttendanceController::class, 'endLunch'])->name('attendance.lunch.end');
-    Route::post('attendance/check-out', [AttendanceController::class, 'checkOut'])->name('attendance.check-out');
-    Route::post('attendance/forgot-check-out', [AttendanceController::class, 'storeForgotCheckOut'])->name('attendance.forgot-check-out');
-    Route::post('attendance/submit-for-approval', [AttendanceController::class, 'submitForApproval'])
-        ->name('attendance.submit-for-approval');
-    Route::put('attendance/{attendance}', [AttendanceController::class, 'updateAttendance'])->name('attendance.update');
-    Route::delete('attendance/{attendance}', [AttendanceController::class, 'destroyAttendance'])->name('attendance.destroy');
     // For Approvals
     Route::get('for-approvals', [ForApprovalController::class, 'index'])
         ->name('for-approvals.index');
@@ -116,17 +104,8 @@ Route::middleware(['auth', 'verified', 'user-type:SOS Admin,Superadmin,Client Ad
         ->name('attendance.reject');
     Route::patch('travel-allowance/{travelAllowance}/approve', [TravelAllowanceController::class, 'approve'])
     ->name('travel-allowance.approve');
-
     Route::patch('travel-allowance/{travelAllowance}/reject', [TravelAllowanceController::class, 'reject'])
     ->name('travel-allowance.reject');
-
-
-
-
-
-
-
-
 
 
 });
