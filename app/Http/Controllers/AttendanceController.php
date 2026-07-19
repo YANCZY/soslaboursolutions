@@ -515,12 +515,18 @@ class AttendanceController extends Controller
 
     private function canApproveClient(Request $request, ?int $clientId): bool
     {
+
+        if ($request->user()->userType?->user_type_name === 'Superadmin') {
+            return true;
+        }
+
         if (! $clientId) {
             return false;
         }
 
         return $request->user()->client_id === $clientId
             || $request->user()->clients()->where('clients.id', $clientId)->exists();
+
     }
 
     private function formatWeekLabelFromAttendance($records): string

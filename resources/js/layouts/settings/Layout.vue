@@ -38,13 +38,21 @@ const sidebarNavItems: NavItem[] = [
 const page = usePage();
 
 const visibleSidebarNavItems = computed(() => {
-    if (page.props.auth.user_type === 'Contractor') {
+    const userType = page.props.auth.user_type;
+
+    if (['Superadmin', 'SOS Admin'].includes(userType ?? '')) {
+        return sidebarNavItems;
+    }
+
+    if (userType === 'Client Admin') {
         return sidebarNavItems.filter((item) =>
-            ['Profile', 'Security', 'Appearance'].includes(item.title),
+            ['Profile', 'Security', 'Appearance', 'Company', 'Users'].includes(item.title),
         );
     }
 
-    return sidebarNavItems;
+    return sidebarNavItems.filter((item) =>
+        ['Profile', 'Security', 'Appearance'].includes(item.title),
+    );
 });
 
 const { isCurrentOrParentUrl } = useCurrentUrl();
