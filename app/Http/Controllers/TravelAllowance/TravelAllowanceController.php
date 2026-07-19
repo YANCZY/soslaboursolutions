@@ -223,6 +223,10 @@ class TravelAllowanceController extends Controller
 
     private function canApproveClient(Request $request, ?int $clientId): bool
     {
+        if ($request->user()->userType?->user_type_name === 'Superadmin') {
+            return true;
+        }
+
         if (! $clientId) {
             return false;
         }
