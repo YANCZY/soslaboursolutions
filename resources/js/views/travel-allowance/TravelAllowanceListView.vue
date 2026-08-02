@@ -1,10 +1,18 @@
 <script setup lang="ts">
-import { Pencil, Plus, Search, Trash2 } from 'lucide-vue-next';
+import { EllipsisVertical, FileText, Pencil, Plus, Search, Trash2 } from 'lucide-vue-next';
 import { computed, ref, watch } from 'vue';
 import { toast } from 'vue-sonner';
+import ExportPdfDialog from '@/components/ExportPdfDialog.vue';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
+
 import {
     Select,
     SelectContent,
@@ -12,6 +20,8 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+
+import { exportBrandedPdf } from '@/lib/exportBrandedPdf';
 
 const emit = defineEmits<{
     add: [];
@@ -52,6 +62,7 @@ type PaginationItem = {
 const rowsPerPage = ref('15');
 const currentPage = ref(1);
 const search = ref('');
+const exportDialogOpen = ref(false);
 
 const selectedTravelAllowanceIds = ref<number[]>([]);
 
@@ -147,6 +158,46 @@ const filteredTravelAllowances = computed(() => {
         return [date, company, status].some((field) => field.includes(value));
     });
 });
+
+const openExportDialog = () => {
+    exportDialogOpen.value = true;
+};
+
+const exportTravelAllowanceAsPdf = (range: { startDate: string; endDate: string }) => {
+    const records = filteredTravelAllowances.value.filter((allowance) =>
+        allowance.date >= range.startDate &&
+        allowance.date <= range.endDate,
+    );
+
+    if (records.length === 0) {
+        toast.error('No travel allowance records found for the selected date range.');
+
+        return;
+    }
+
+    const result = exportBrandedPdf({
+        title: 'Travel Allowance Report',
+        records,
+        columns: [
+            { header: 'Date', value: (allowance) => formatDate(allowance.date) },
+            { header: 'Name', value: (allowance) => allowance.name },
+            { header: 'Company', value: (allowance) => allowance.company },
+            { header: 'Description', value: (allowance) => allowance.description || '-' },
+            { header: 'Status', value: (allowance) => formatApprovalStatus(allowance.approval_status) },
+            { header: 'Quantity', value: (allowance) => allowance.quantity },
+            { header: 'Rate', value: (allowance) => formatCurrency(allowance.rate) },
+            { header: 'Amount', value: (allowance) => formatCurrency(allowance.amount) },
+        ],
+    });
+
+    if (result === 'blocked') {
+        toast.error('Please allow pop-ups to export the travel allowance PDF.');
+
+        return;
+    }
+
+    exportDialogOpen.value = false;
+};
 
 const totalPages = computed(() =>
     Math.max(
@@ -384,10 +435,32 @@ watch([rowsPerPage, search], () => {
                 />
             </div>
 
-            <Button type="button" class="gap-2" @click="emit('add')">
-                <Plus class="size-4" />
-                Add Allowance
-            </Button>
+            <div class="flex items-center gap-2">
+                <Button type="button" class="gap-2" @click="emit('add')">
+                    <Plus class="size-4" />
+                    Add Allowance
+                </Button>
+
+                <DropdownMenu>
+                    <DropdownMenuTrigger :as-child="true">
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="icon-sm"
+                            aria-label="Travel allowance actions"
+                        >
+                            <EllipsisVertical class="size-4" />
+                        </Button>
+                    </DropdownMenuTrigger>
+
+                    <DropdownMenuContent align="end" class="w-44">
+                        <DropdownMenuItem class="cursor-pointer" @click="openExportDialog">
+                            <FileText class="size-4" />
+                            Export as PDF
+                        </DropdownMenuItem>
+                    </DropdownMenuContent>
+                </DropdownMenu>
+            </div>
         </div>
 
         <div class="flex min-h-0 flex-1 flex-col overflow-hidden rounded-md border bg-card">
@@ -575,5 +648,11 @@ watch([rowsPerPage, search], () => {
             </div>
         </div>
         </div>
+        <ExportPdfDialog
+            v-model:open="exportDialogOpen"
+            title="Export Travel Allowance PDF"
+            description="Select the travel allowance date range you want to include in the report."
+            @export="exportTravelAllowanceAsPdf"
+        />
     </div>
 </template>

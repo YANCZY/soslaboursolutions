@@ -50,14 +50,8 @@ const emit = defineEmits<{
 const selectedCompanyStorageKey = 'attendance:selected-company-id';
 const activeAttendance = ref<Attendance | null>(props.attendance);
 
-const storedCompanyId = Number(localStorage.getItem(selectedCompanyStorageKey));
-
 const selectedCompanyId = ref<number | null>(
-    props.companies.length === 1
-        ? props.companies[0].id
-        : props.companies.some((company) => company.id === storedCompanyId)
-            ? storedCompanyId
-            : null,
+    props.companies.length === 1 ? props.companies[0].id : null,
 );
 
 const companyError = ref('');
@@ -347,6 +341,17 @@ const saveForgotLogout = async () => {
 };
 
 onMounted(() => {
+
+    const storedCompanyId = Number(localStorage.getItem(selectedCompanyStorageKey));
+
+    if (
+        props.companies.length > 1 &&
+        props.companies.some((company) => company.id === storedCompanyId)
+    ) {
+        selectedCompanyId.value = storedCompanyId;
+        companySearch.value =
+            props.companies.find((company) => company.id === storedCompanyId)?.company_name ?? '';
+    }
 
     if (props.companies.length === 1) {
         localStorage.setItem(selectedCompanyStorageKey, String(props.companies[0].id));

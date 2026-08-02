@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { ChevronLeft, ChevronRight, Info, Pencil, Search, Trash2 } from 'lucide-vue-next';
+import { ChevronLeft, ChevronRight, EllipsisVertical, FileText, Info, Pencil, Search, Trash2 } from 'lucide-vue-next';
 import { computed, ref, watch } from 'vue';
 import { toast } from 'vue-sonner';
+import ExportPdfDialog from '@/components/ExportPdfDialog.vue';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
@@ -12,8 +13,14 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
-
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
+
 import {
     Select,
     SelectContent,
@@ -30,6 +37,7 @@ import {
     TooltipProvider,
     TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { exportBrandedPdf } from '@/lib/exportBrandedPdf';
 import EditAttendance from '@/views/attendance/EditAttendance.vue';
 
 type AttendanceWorkDetail = {
@@ -95,9 +103,11 @@ const emit = defineEmits<{
     'attendance-updated': [];
 }>();
 
+
 const editDialogOpen = ref(false);
 const deleteDialogOpen = ref(false);
 const submitApprovalDialogOpen = ref(false);
+const exportDialogOpen = ref(false);
 const selectedRecord = ref<Attendance | null>(null);
 const selectedWeekRecords = ref<Attendance[]>([]);
 const formError = ref('');
@@ -657,6 +667,47 @@ const filteredAttendanceRecords = computed(() => {
     });
 });
 
+const openExportDialog = () => {
+    exportDialogOpen.value = true;
+};
+
+const exportAttendanceAsPdf = (range: { startDate: string; endDate: string }) => {
+    const records = filteredAttendanceRecords.value.filter((record) =>
+        record.check_in_date >= range.startDate &&
+        record.check_in_date <= range.endDate,
+    );
+
+    if (records.length === 0) {
+        toast.error('No attendance records found for the selected date range.');
+
+        return;
+    }
+
+    const result = exportBrandedPdf({
+        title: 'Attendance Report',
+        records,
+        columns: [
+            { header: 'Name', value: (record) => formatUserName(record.user) },
+            { header: 'Company', value: (record) => formatCompanyName(record) },
+            { header: 'Date', value: (record) => formatDate(record.check_in_date) },
+            { header: 'Check In', value: (record) => formatTime(record.check_in_time) },
+            { header: 'Check Out', value: (record) => formatTime(record.check_out_time) },
+            { header: 'Total Work Hours', value: (record) => formatDuration(totalWorkSeconds(record)) },
+            { header: 'Total Lunch Break', value: (record) => formatDuration(totalLunchBreakSeconds(record)) },
+            { header: 'Total Overtime', value: (record) => formatDuration(totalOvertimeSeconds(record)) },
+            { header: 'Status', value: (record) => formatApprovalStatus(record.approval_status) },
+        ],
+    });
+
+    if (result === 'blocked') {
+        toast.error('Please allow pop-ups to export the attendance PDF.');
+
+        return;
+    }
+
+    exportDialogOpen.value = false;
+};
+
 const totalPages = computed(() => {
     return Math.max(1, Math.ceil(filteredAttendanceRecords.value.length / Number(rowsPerPage.value)));
 });
@@ -766,6 +817,20 @@ class="relative w-full sm:w-56 lg:w-72"
                         class="h-8 pl-8 text-sm"
                     />
                 </div>
+                <DropdownMenu>
+                    <DropdownMenuTrigger :as-child="true">
+                        <Button type="button" variant="outline" size="icon-sm" aria-label="Attendance actions">
+                            <EllipsisVertical class="size-4" />
+                        </Button>
+                    </DropdownMenuTrigger>
+
+                    <DropdownMenuContent align="end" class="w-44">
+                        <DropdownMenuItem class="cursor-pointer" @click="openExportDialog">
+                            <FileText class="size-4" />
+                            Export as PDF
+                        </DropdownMenuItem>
+                    </DropdownMenuContent>
+                </DropdownMenu>
             </div>
         </div>
 
@@ -1103,5 +1168,9 @@ colspan="11"
                 </DialogFooter>
             </DialogContent>
         </Dialog>
+        <!-- EXPORT MODAL DATE RANGE -->
+        <ExportPdfDialog v-model:open="exportDialogOpen" title="Export Attendance PDF"
+            description="Select the attendance date range you want to include in the report."
+            @export="exportAttendanceAsPdf" />
     </div>
 </template>
