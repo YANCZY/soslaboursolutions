@@ -1,12 +1,19 @@
 <script setup lang="ts">
 import { router } from '@inertiajs/vue3';
-import { Check, Filter, Search, X } from 'lucide-vue-next';
+import { Check, EllipsisVertical, FileText, Filter, Search, X } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
 import { toast } from 'vue-sonner';
-
+import ExportPdfDialog from '@/components/ExportPdfDialog.vue';
 
 import { Button } from '@/components/ui/button';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
+
 import {
     Select,
     SelectContent,
@@ -14,6 +21,8 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+
+import { exportBrandedPdf } from '@/lib/exportBrandedPdf';
 
 const csrfToken = () =>
     document
@@ -57,6 +66,7 @@ const selectedApprovalType = ref<'attendance' | 'travel-allowance'>(
 );
 const showStatusFilter = ref(false);
 const selectedStatus = ref<'all' | 'pending' | 'approved' | 'rejected'>('all');
+const exportDialogOpen = ref(false);
 
 const formatTime = (time: string | null) => {
     if (!time) {
@@ -186,6 +196,90 @@ const visibleApprovalCount = computed(() =>
         ? filteredAttendanceApprovalRecords.value.length
         : filteredTravelAllowanceApprovalRecords.value.length,
 );
+
+const exportDialogTitle = computed(() =>
+    selectedApprovalType.value === 'attendance'
+        ? 'Export For Approval Attendance PDF'
+        : 'Export For Approval Travel Allowance PDF',
+);
+
+const openExportDialog = () => {
+    exportDialogOpen.value = true;
+};
+
+const exportForApprovalsAsPdf = (range: { startDate: string; endDate: string }) => {
+    if (selectedApprovalType.value === 'attendance') {
+        const records = filteredAttendanceApprovalRecords.value.filter((record) =>
+            record.date >= range.startDate &&
+            record.date <= range.endDate,
+        );
+
+        if (records.length === 0) {
+            toast.error('No attendance approval records found for the selected date range.');
+
+            return;
+        }
+
+        const result = exportBrandedPdf({
+            title: 'For Approval Attendance Report',
+            records,
+            columns: [
+                { header: 'Date', value: (record) => formatDate(record.date) },
+                { header: 'Name', value: (record) => record.name },
+                { header: 'Company', value: (record) => record.company },
+                { header: 'Status', value: (record) => formatApprovalStatus(record.approval_status) },
+                { header: 'Check In', value: (record) => formatTime(record.check_in) },
+                { header: 'Check Out', value: (record) => formatTime(record.check_out) },
+                { header: 'Total Work Hours', value: (record) => formatDuration(record.total_work_hours) },
+                { header: 'Total Overtime', value: (record) => formatDuration(record.total_overtime) },
+            ],
+        });
+
+        if (result === 'blocked') {
+            toast.error('Please allow pop-ups to export the approval PDF.');
+
+            return;
+        }
+
+        exportDialogOpen.value = false;
+
+        return;
+    }
+
+    const records = filteredTravelAllowanceApprovalRecords.value.filter((record) =>
+        record.date >= range.startDate &&
+        record.date <= range.endDate,
+    );
+
+    if (records.length === 0) {
+        toast.error('No travel allowance approval records found for the selected date range.');
+
+        return;
+    }
+
+    const result = exportBrandedPdf({
+        title: 'For Approval Travel Allowance Report',
+        records,
+        columns: [
+            { header: 'Date', value: (record) => formatDate(record.date) },
+            { header: 'Name', value: (record) => record.name },
+            { header: 'Company', value: (record) => record.company },
+            { header: 'Description', value: (record) => record.description || '-' },
+            { header: 'Status', value: (record) => formatApprovalStatus(record.approval_status) },
+            { header: 'Quantity', value: (record) => record.quantity },
+            { header: 'Rate', value: (record) => formatCurrency(record.rate) },
+            { header: 'Amount', value: (record) => formatCurrency(record.amount) },
+        ],
+    });
+
+    if (result === 'blocked') {
+        toast.error('Please allow pop-ups to export the approval PDF.');
+
+        return;
+    }
+
+    exportDialogOpen.value = false;
+};
 
 const refreshApprovalRecords = (successMessage: string) => {
     router.reload({
@@ -322,6 +416,26 @@ const rejectRecord = async (id: number) => {
                         <SelectItem value="travel-allowance">Travel Allowance</SelectItem>
                     </SelectContent>
                 </Select>
+
+                <DropdownMenu>
+                    <DropdownMenuTrigger :as-child="true">
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="icon"
+                            aria-label="For approval actions"
+                        >
+                            <EllipsisVertical class="size-4" />
+                        </Button>
+                    </DropdownMenuTrigger>
+
+                    <DropdownMenuContent align="end" class="w-44">
+                        <DropdownMenuItem class="cursor-pointer" @click="openExportDialog">
+                            <FileText class="size-4" />
+                            Export as PDF
+                        </DropdownMenuItem>
+                    </DropdownMenuContent>
+                </DropdownMenu>
             </div>
         </div>
 
@@ -474,5 +588,11 @@ colspan="9"
                 </p>
             </div>
         </div>
+        <ExportPdfDialog
+            v-model:open="exportDialogOpen"
+            :title="exportDialogTitle"
+            description="Select the approval date range you want to include in the report."
+            @export="exportForApprovalsAsPdf"
+        />
     </div>
 </template>
