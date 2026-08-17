@@ -262,6 +262,14 @@ const startOfWeek = (date: string) => {
     return value;
 };
 
+const formatDateKey = (date: Date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+
+    return `${year}-${month}-${day}`;
+};
+
 const formatWeekRange = (date: string) => {
     const monday = startOfWeek(date);
     const sunday = new Date(monday);
@@ -758,7 +766,7 @@ const groupedAttendanceRecords = computed(() => {
 
     for (const record of paginatedAttendanceRecords.value) {
         const monday = startOfWeek(record.check_in_date);
-        const weekStart = monday.toISOString().slice(0, 10);
+        const weekStart = formatDateKey(monday);
 
         if (!groups.has(weekStart)) {
             groups.set(weekStart, {
