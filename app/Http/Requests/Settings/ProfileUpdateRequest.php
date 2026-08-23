@@ -33,7 +33,7 @@ class ProfileUpdateRequest extends FormRequest
             'travel_allowance_currency' => ['required', 'string', 'size:3'],
             'salary' => ['required', 'numeric', 'min:0'],
             'start_shift' => ['nullable', 'required_with:end_shift', 'date_format:H:i'],
-            'end_shift' => ['nullable', 'required_with:start_shift', 'date_format:H:i', 'after:start_shift'],
+            'end_shift' => ['nullable', 'required_with:start_shift', 'date_format:H:i'],
         ];
     }
 
@@ -69,9 +69,13 @@ class ProfileUpdateRequest extends FormRequest
                 ->where('client_id', '!=', (int) $this->input('client_id'))
                 ->whereNotNull('start_shift')
                 ->whereNotNull('end_shift')
-                ->where('start_shift', '<', $endShift)
-                ->where('end_shift', '>', $startShift)
-                ->first();
+                ->get()
+                ->first(fn ($workDetail) => $this->shiftsOverlap(
+                    $startShift,
+                    $endShift,
+                    $workDetail->start_shift,
+                    $workDetail->end_shift,
+                ));
 
             if ($overlappingShift) {
                 $validator->errors()->add(
@@ -80,5 +84,41 @@ class ProfileUpdateRequest extends FormRequest
                 );
             }
         });
+    }
+
+    private function shiftsOverlap(string $startA, string $endA, string $startB, string $endB): bool
+    {
+        foreach ($this->shiftRanges($startA, $endA) as [$aStart, $aEnd]) {
+            foreach ($this->shiftRanges($startB, $endB) as [$bStart, $bEnd]) {
+                if ($aStart < $bEnd && $bStart < $aEnd) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private function shiftRanges(string $start, string $end): array
+    {
+        $startMinutes = $this->timeToMinutes($start);
+        $endMinutes = $this->timeToMinutes($end);
+
+        if ($endMinutes <= $startMinutes) {
+            $endMinutes += 24 * 60;
+        }
+
+        return [
+            [$startMinutes - (24 * 60), $endMinutes - (24 * 60)],
+            [$startMinutes, $endMinutes],
+            [$startMinutes + (24 * 60), $endMinutes + (24 * 60)],
+        ];
+    }
+
+    private function timeToMinutes(string $time): int
+    {
+        [$hours, $minutes] = explode(':', $time);
+
+        return ((int) $hours * 60) + (int) $minutes;
     }
 }
