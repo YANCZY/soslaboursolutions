@@ -386,23 +386,19 @@ const formatDuration = (seconds: number | null | undefined) => {
     return `${hours}h ${minutes}m`;
 };
 
+const SECONDS_PER_DAY = 24 * 60 * 60;
+
 const secondsBetweenTimes = (start: string | null, end: string | null) => {
-    if (!start || !end) {
+    const startTotal = timeToSeconds(start);
+    let endTotal = timeToSeconds(end);
+
+    if (startTotal === null || endTotal === null) {
         return 0;
     }
 
-    const [startHours, startMinutes, startSeconds = '0'] = start.split(':');
-    const [endHours, endMinutes, endSeconds = '0'] = end.split(':');
-
-    const startTotal =
-        Number(startHours) * 3600 +
-        Number(startMinutes) * 60 +
-        Number(startSeconds);
-
-    const endTotal =
-        Number(endHours) * 3600 +
-        Number(endMinutes) * 60 +
-        Number(endSeconds);
+    if (endTotal <= startTotal) {
+        endTotal += SECONDS_PER_DAY;
+    }
 
     return Math.max(0, endTotal - startTotal);
 };
@@ -423,7 +419,15 @@ const overlapSeconds = (
     windowStart: number,
     windowEnd: number,
 ) => {
-    return Math.max(0, Math.min(end, windowEnd) - Math.max(start, windowStart));
+    const normalizedEnd = end <= start ? end + SECONDS_PER_DAY : end;
+    const normalizedWindowEnd =
+        windowEnd <= windowStart ? windowEnd + SECONDS_PER_DAY : windowEnd;
+
+    return Math.max(
+        0,
+        Math.min(normalizedEnd, normalizedWindowEnd) -
+            Math.max(start, windowStart),
+    );
 };
 
 const totalLunchBreakSeconds = (record: Attendance) => {
