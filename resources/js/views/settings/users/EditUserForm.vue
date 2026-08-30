@@ -87,16 +87,6 @@ const selectedCompanies = computed(() =>
     props.companies.filter((company) => form.client_ids.includes(company.id)),
 );
 
-const selectedWorkCompany = computed(() =>
-    selectedCompanies.value.find((company) => company.id === form.work_detail.client_id) ?? null,
-);
-
-const selectedWorkDetail = computed(() =>
-    props.user.company_work_details.find(
-        (detail) => detail.client_id === form.work_detail.client_id,
-    ) ?? null,
-);
-
 const fillWorkDetail = (companyId: number | null) => {
     const detail = props.user.company_work_details.find(
         (workDetail) => workDetail.client_id === companyId,
@@ -209,15 +199,60 @@ const loadMoreCompanies = (event: Event) => {
     companyVisibleLimit.value += 4;
 };
 
+const toBackendTime = (value: string | null) => {
+    if (!value) {
+        return '';
+    }
+
+    const trimmedValue = value.trim();
+
+    if (/^\d{2}:\d{2}$/.test(trimmedValue)) {
+        return trimmedValue;
+    }
+
+    if (/^\d{2}:\d{2}:\d{2}$/.test(trimmedValue)) {
+        return trimmedValue.slice(0, 5);
+    }
+
+    const match = trimmedValue.match(/^(0[1-9]|1[0-2]):([0-5][0-9])\s(AM|PM)$/i);
+
+    if (!match) {
+        return trimmedValue;
+    }
+
+    let hour = Number(match[1]);
+    const minute = match[2];
+    const period = match[3].toUpperCase();
+
+    if (period === 'PM' && hour !== 12) {
+        hour += 12;
+    }
+
+    if (period === 'AM' && hour === 12) {
+        hour = 0;
+    }
+
+    return `${String(hour).padStart(2, '0')}:${minute}`;
+};
+
 const submit = () => {
-    form.patch(`/settings/users/${props.user.id}`, {
-        preserveScroll: true,
-        onSuccess: () => {
-            toast.success('User has been updated.');
-            emit('update:open', false);
-            emit('saved');
-        },
-    });
+    form
+        .transform((data) => ({
+            ...data,
+            work_detail: {
+                ...data.work_detail,
+                start_shift: toBackendTime(data.work_detail.start_shift),
+                end_shift: toBackendTime(data.work_detail.end_shift),
+            },
+        }))
+        .patch(`/settings/users/${props.user.id}`, {
+            preserveScroll: true,
+            onSuccess: () => {
+                toast.success('User has been updated.');
+                emit('update:open', false);
+                emit('saved');
+            },
+        });
 };
 </script>
 
