@@ -320,6 +320,7 @@ function submit() {
                                         min="0"
                                         name="salary"
                                         class="pl-12"
+disabled
                                     />
                                 </div>
                                 <InputError :message="form.errors.salary" />
@@ -339,6 +340,7 @@ function submit() {
                                         min="0"
                                         name="travel_allowance"
                                         class="pl-12"
+disabled
                                     />
                                 </div>
                                 <InputError :message="form.errors.travel_allowance" />
@@ -352,12 +354,14 @@ function submit() {
                                     name="travel_allowance_currency"
                                     maxlength="3"
                                     placeholder="AUD"
+disabled
                                 />
                                 <InputError :message="form.errors.travel_allowance_currency" />
                             </div>
                             <div class="space-y-2">
                                 <Label for="job_role">Job role</Label>
-                                <Input id="job_role" v-model="form.job_role" name="job_role" placeholder="Job role" />
+                                <Input id="job_role" v-model="form.job_role" name="job_role" placeholder="Job role"
+                                    disabled />
                                 <InputError :message="form.errors.job_role" />
                             </div>
                         </div>
@@ -377,6 +381,7 @@ function submit() {
 v-model="form.start_shift"
                                     name="start_shift"
                                     placeholder="Select start time"
+disabled
                                 />
                                 <InputError :message="form.errors.start_shift" />
                             </div>
@@ -384,10 +389,8 @@ v-model="form.start_shift"
                             <div class="space-y-2">
                                 <Label for="end_shift">End shift</Label>
                                 <ShiftTimePicker
-                                    id="end_shift"
-v-model="form.end_shift"
-                                    name="end_shift"
-                                    placeholder="Select end time"
+id="start_shift" v-model="form.start_shift" name="start_shift"
+                                    placeholder="Select start time" disabled
                                 />
                                 <InputError :message="form.errors.end_shift" />
                             </div>

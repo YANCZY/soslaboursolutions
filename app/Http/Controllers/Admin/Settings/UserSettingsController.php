@@ -30,7 +30,11 @@ class UserSettingsController extends Controller
 
         return Inertia::render('admin/settings/users/index', [
            'users' => User::query()
-                ->with(['clients:id,company_name', 'userType:id,user_type_name'])
+                ->with([
+                    'clients:id,company_name',
+                    'userType:id,user_type_name',
+                    'companyWorkDetails:id,user_id,client_id,job_role,salary,travel_allowance,travel_allowance_currency,start_shift,end_shift',
+                ])
             ->select('id', 'first_name', 'last_name', 'email', 'status', 'phone', 'mobile', 'client_id', 'user_type_id')
                 ->when($status !== 'all', fn($query) => $query->where('status', $status))
             ->when($search !== '', function ($query) use ($search) {
@@ -129,6 +133,14 @@ class UserSettingsController extends Controller
             'phone' => 'nullable|string|max:20',
             'mobile' => 'nullable|string|max:20',
             'client_ids' => ['required', 'array', 'max:3'],
+            'work_detail' => ['required', 'array'],
+            'work_detail.client_id' => ['required', 'integer', 'exists:clients,id'],
+            'work_detail.salary' => ['required', 'numeric', 'min:0'],
+            'work_detail.travel_allowance' => ['required', 'numeric', 'min:0'],
+            'work_detail.travel_allowance_currency' => ['required', 'string', 'size:3'],
+            'work_detail.job_role' => ['nullable', 'string', 'max:255'],
+            'work_detail.start_shift' => ['required', 'date_format:H:i'],
+            'work_detail.end_shift' => ['required', 'date_format:H:i'],
             'client_ids.*' => ['required', 'exists:clients,id'],
             'user_type_id' => [
                 'required',
@@ -137,6 +149,13 @@ class UserSettingsController extends Controller
         ]);
 
         $clientIds = $validated['client_ids'];
+
+        if (! in_array((int) $validated['work_detail']['client_id'], $clientIds, true)) {
+            return back()->withErrors([
+                'work_detail.client_id' => 'Select one of the assigned companies before saving work details.',
+            ]);
+        }
+
         unset($validated['client_ids']);
 
         $user->update([
@@ -146,6 +165,18 @@ class UserSettingsController extends Controller
         ]);
 
         $user->clients()->sync($clientIds);
+
+        $user->companyWorkDetails()->updateOrCreate(
+            ['client_id' => $validated['work_detail']['client_id']],
+            [
+                'salary' => $validated['work_detail']['salary'],
+                'travel_allowance' => $validated['work_detail']['travel_allowance'],
+                'travel_allowance_currency' => $validated['work_detail']['travel_allowance_currency'],
+                'job_role' => $validated['work_detail']['job_role'],
+                'start_shift' => $validated['work_detail']['start_shift'],
+                'end_shift' => $validated['work_detail']['end_shift'],
+            ]
+        );
 
         return back();
     }

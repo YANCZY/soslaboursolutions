@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ChevronLeft, ChevronRight, EllipsisVertical, FileText, Info, Pencil, Search, Trash2 } from 'lucide-vue-next';
+import { ChevronLeft, ChevronRight, EllipsisVertical, FileText, Info, Pencil, Plus, Search, Trash2 } from 'lucide-vue-next';
 import { computed, ref, watch } from 'vue';
 import { toast } from 'vue-sonner';
 import ExportPdfDialog from '@/components/ExportPdfDialog.vue';
@@ -38,6 +38,7 @@ import {
     TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { exportBrandedPdf } from '@/lib/exportBrandedPdf';
+import AddShift from '@/views/attendance/AddShift.vue';
 import EditAttendance from '@/views/attendance/EditAttendance.vue';
 
 type AttendanceWorkDetail = {
@@ -59,6 +60,7 @@ type AttendanceCompany = {
 
 type Attendance = {
     id: number;
+    covering_for?: string | null;
     check_in_date: string;
     check_in_time: string | null;
     check_out_time: string | null;
@@ -95,8 +97,24 @@ const assignedWorkDetail = (record: Attendance) => {
     ) ?? null;
 };
 
+type Company = {
+    id: number;
+    company_name: string;
+};
+
+const addShiftDialogOpen = ref(false);
+
+const addShiftForm = ref({
+    check_in_date: '',
+    check_in_time: '',
+    check_out_time: '',
+    client_id: '',
+    covering_for: '',
+});
+
 const props = defineProps<{
     attendanceRecords: Attendance[];
+    companies: Company[];
 }>();
 
 const emit = defineEmits<{
@@ -560,6 +578,48 @@ const overtimeDetails = (record: Attendance) => {
     ];
 };
 
+const openAddShift = () => {
+    formError.value = '';
+
+    addShiftForm.value = {
+        check_in_date: '',
+        check_in_time: '',
+        check_out_time: '',
+        client_id: '',
+        covering_for: '',
+    };
+
+    addShiftDialogOpen.value = true;
+};
+
+const saveAddedShift = async () => {
+    formError.value = '';
+
+    const response = await fetch('/attendance', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {
+            Accept: 'application/json',
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ?? '',
+        },
+        body: JSON.stringify(addShiftForm.value),
+    });
+
+    const data = await response.json().catch(() => null);
+
+    if (!response.ok) {
+        formError.value = data?.message ?? 'Unable to add shift.';
+
+        return;
+    }
+
+    toast.success(data?.message ?? 'Shift added successfully.');
+    addShiftDialogOpen.value = false;
+    emit('attendance-updated');
+};
+
 const openEditDialog = (record: Attendance) => {
     selectedRecord.value = record;
     formError.value = '';
@@ -797,10 +857,43 @@ const visibleTableRowCount = computed(() => {
 <template>
     <div class="w-full space-y-3 px-4 pt-3">
         <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div class="flex flex-wrap items-center gap-3">
-                <h2 class="text-lg font-semibold tracking-tight">
+            <div class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-2">
+                <h2 class="mr-1 shrink-0 text-lg font-semibold tracking-tight">
                     Attendance
                 </h2>
+
+                <div class="flex shrink-0 items-center gap-1.5">
+                    <Button type="button" size="sm" class="shrink-0" @click="openAddShift">
+                        <Plus class="size-4" />
+                        Add Shift
+                    </Button>
+
+                    <TooltipProvider :delay-duration="100">
+                        <Tooltip>
+                            <TooltipTrigger as-child>
+                                <button type="button"
+                                    class="inline-flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                                    aria-label="Shift information">
+                                    <Info class="size-4" />
+                                </button>
+                            </TooltipTrigger>
+
+                            <TooltipContent
+                                side="top"
+                                align="center"
+                                :side-offset="4"
+                                class="border border-border bg-popover px-3 py-2 text-popover-foreground shadow-md"
+                            >
+                                <div class="space-y-1 text-sm">
+                                    <div class="font-medium">Add Shift</div>
+                                    <div class="text-muted-foreground">
+                                        Used when you need to cover someone else's shift.
+                                    </div>
+                                </div>
+                            </TooltipContent>
+                        </Tooltip>
+                    </TooltipProvider>
+                </div>
             </div>
 
             <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -919,7 +1012,35 @@ class="overflow-x-auto overscroll-x-contain"
                                     />
                                 </td>
                                 <td class="px-4 py-3 font-medium whitespace-nowrap">
-                                    {{ formatUserName(record.user) }}
+                                    <div class="flex items-center gap-2">
+                                        <span>{{ formatUserName(record.user) }}</span>
+
+                                        <TooltipProvider v-if="record.covering_for" :delay-duration="100">
+                                            <Tooltip>
+                                                <TooltipTrigger as-child>
+                                                    <span
+                                                        class="inline-flex shrink-0 cursor-default items-center rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-xs font-medium text-sky-700 dark:border-sky-900/60 dark:bg-sky-950/40 dark:text-sky-300"
+                                                    >
+                                                        Shift Cover
+                                                    </span>
+                                                </TooltipTrigger>
+
+                                                <TooltipContent
+                                                    side="top"
+                                                    align="center"
+                                                    :side-offset="4"
+                                                    class="border border-border bg-popover px-3 py-2 text-popover-foreground shadow-md"
+                                                >
+                                                    <div class="space-y-1 text-sm">
+                                                        <div class="font-medium">Covering For</div>
+                                                        <div class="text-muted-foreground">
+                                                            {{ record.covering_for }}
+                                                        </div>
+                                                    </div>
+                                                </TooltipContent>
+                                            </Tooltip>
+                                        </TooltipProvider>
+                                    </div>
                                 </td>
                                 <td class="px-4 py-3 whitespace-nowrap">
                                     <div class="flex items-center gap-2">
@@ -1126,6 +1247,8 @@ colspan="11"
                 </div>
 
         </div>
+        <AddShift v-model:open="addShiftDialogOpen" :form="addShiftForm" :companies="props.companies" :error="formError"
+            @update:form="addShiftForm = $event" @save="saveAddedShift" />
         <EditAttendance
             v-model:open="editDialogOpen"
             :attendance="selectedRecord"

@@ -14,6 +14,7 @@ class Attendance extends Model
         'check_in_date',
         'employee_id',
         'client_id',
+        'covering_for',
         'status',
         'approval_status',
         'submitted_for_approval_at',

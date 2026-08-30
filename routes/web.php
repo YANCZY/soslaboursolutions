@@ -49,6 +49,8 @@ Route::middleware([
     // ATTENDANCE
     Route::get('attendance', [AttendanceController::class, 'index'])
         ->name('attendance.index');
+    Route::post('attendance', [AttendanceController::class, 'store'])
+    ->name('attendance.store');
     Route::post('attendance/check-in', [AttendanceController::class, 'checkIn'])
         ->name('attendance.check-in');
     Route::post('attendance/lunch/start', [AttendanceController::class, 'startLunch'])

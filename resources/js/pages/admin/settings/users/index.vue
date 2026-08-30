@@ -35,13 +35,22 @@ import {
 import SettingsLayout from '@/layouts/settings/Layout.vue';
 import EditUserForm from '@/views/settings/users/EditUserForm.vue';
 
-
+type WorkDetail = {
+    client_id: number;
+    job_role?: string | null;
+    salary?: string | number | null;
+    travel_allowance?: string | number | null;
+    travel_allowance_currency?: string | null;
+    start_shift?: string | null;
+    end_shift?: string | null;
+};
 
 type User = {
     id: number;
     first_name: string;
     last_name: string;
     email: string;
+    company_work_details: WorkDetail[];
     user_type_id: number;
     status: 'active' | 'inactive' | 'pending';
     phone: string | null;
@@ -137,6 +146,9 @@ const addUserDialogOpen = ref(false);
 
 const editUserDialogOpen = ref(false);
 const selectedUser = ref<User | null>(null);
+
+const statusConfirmationOpen = ref(false);
+const userToToggleStatus = ref<User | null>(null);
 
 const openEditUser = (user: User) => {
     selectedUser.value = user;
@@ -311,7 +323,22 @@ const statusBadgeClass = (status: User['status']) => {
     return 'border-red-200 bg-red-50 text-red-700 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300';
 };
 
-const toggleStatus = (user: User) => {
+const openStatusConfirmation = (user: User) => {
+    userToToggleStatus.value = user;
+    statusConfirmationOpen.value = true;
+};
+
+const cancelStatusConfirmation = () => {
+    statusConfirmationOpen.value = false;
+    userToToggleStatus.value = null;
+};
+
+const confirmToggleStatus = () => {
+    if (!userToToggleStatus.value) {
+        return;
+    }
+
+    const user = userToToggleStatus.value;
     const message =
         user.status === 'active'
             ? 'User has been deactivated.'
@@ -322,7 +349,10 @@ const toggleStatus = (user: User) => {
         {},
         {
             preserveScroll: true,
-            onSuccess: () => toast.success(message),
+            onSuccess: () => {
+                toast.success(message);
+                cancelStatusConfirmation();
+            },
         },
     );
 };
@@ -623,7 +653,7 @@ class="h-8 gap-2 text-white hover:bg-red-700">
     : 'border-border bg-background text-muted-foreground shadow-sm hover:bg-muted/60 hover:text-foreground'"
                                             :title="user.status === 'active' ? 'Deactivate user' : 'Activate user'"
                                             :aria-label="user.status === 'active' ? 'Deactivate user' : 'Activate user'"
-                                            @click="toggleStatus(user)">
+                                            @click="openStatusConfirmation(user)">
                                             <User class="size-4" />
                                         </button>
                                     </div>
@@ -664,7 +694,7 @@ class="h-8 gap-2 text-white hover:bg-red-700">
                                             : 'border-border bg-background text-muted-foreground shadow-sm hover:bg-muted/60 hover:text-foreground'
                                         " :title="user.status === 'active' ? 'Deactivate user' : 'Activate user'"
                                     :aria-label="user.status === 'active' ? 'Deactivate user' : 'Activate user'"
-                                    @click="toggleStatus(user)">
+                                    @click="openStatusConfirmation(user)">
                                     <User class="size-4" />
                                 </button>
                             </div>
@@ -753,7 +783,37 @@ class="h-8 gap-2 text-white hover:bg-red-700">
                 </div>
             </div>
         </div>
-        <EditUserForm v-if="selectedUser" v-model:open="editUserDialogOpen" :user="selectedUser" :companies="companies"
-            :user-types="userTypes" @saved="selectedUser = null" />
+        <EditUserForm
+            v-if="selectedUser"
+            v-model:open="editUserDialogOpen"
+            :user="selectedUser"
+            :companies="companies"
+            :user-types="userTypes"
+            @saved="selectedUser = null"
+        />
+        <Dialog v-model:open="statusConfirmationOpen" @update:open="(open) => !open && cancelStatusConfirmation()">
+            <DialogContent class="sm:max-w-md">
+                <DialogHeader>
+                    <DialogTitle>
+                        {{ userToToggleStatus?.status === 'active' ? 'Deactivate user?' : 'Activate user?' }}
+                    </DialogTitle>
+                    <DialogDescription>
+                        Are you sure you want to
+                        {{ userToToggleStatus?.status === 'active' ? 'deactivate' : 'activate' }}
+                        {{ userToToggleStatus?.first_name }} {{ userToToggleStatus?.last_name }}?
+                    </DialogDescription>
+                </DialogHeader>
+
+                <DialogFooter>
+                    <Button type="button" variant="outline" @click="cancelStatusConfirmation">
+                        Cancel
+                    </Button>
+
+                    <Button type="button" class="bg-red-600 text-white hover:bg-red-700" @click="confirmToggleStatus">
+                        Confirm
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
     </SettingsLayout>
 </template>

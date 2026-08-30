@@ -21,7 +21,12 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { exportBrandedPdf } from '@/lib/exportBrandedPdf';
 
 const csrfToken = () =>
@@ -33,6 +38,7 @@ type AttendanceApprovalRecord = {
     id: number;
     date: string;
     name: string;
+    covering_for?: string | null;
     company: string;
     check_in: string | null;
     check_out: string | null;
@@ -477,7 +483,35 @@ v-for="record in filteredAttendanceApprovalRecords" :key="`attendance-${record.i
                                     {{ formatDate(record.date) }}
                                 </td>
                                 <td class="px-4 py-3 font-medium">
-                                    {{ record.name }}
+                                    <div class="flex items-center gap-2 whitespace-nowrap">
+                                        <span>{{ record.name }}</span>
+
+                                        <TooltipProvider v-if="record.covering_for" :delay-duration="100">
+                                            <Tooltip>
+                                                <TooltipTrigger as-child>
+                                                    <span
+                                                        class="inline-flex shrink-0 cursor-default items-center rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-xs font-medium text-sky-700 dark:border-sky-900/60 dark:bg-sky-950/40 dark:text-sky-300"
+                                                    >
+                                                        Shift Cover
+                                                    </span>
+                                                </TooltipTrigger>
+
+                                                <TooltipContent
+                                                    side="top"
+                                                    align="center"
+                                                    :side-offset="4"
+                                                    class="border border-border bg-popover px-3 py-2 text-popover-foreground shadow-md"
+                                                >
+                                                    <div class="space-y-1 text-sm">
+                                                        <div class="font-medium">Covering For</div>
+                                                        <div class="text-muted-foreground">
+                                                            {{ record.covering_for }}
+                                                        </div>
+                                                    </div>
+                                                </TooltipContent>
+                                            </Tooltip>
+                                        </TooltipProvider>
+                                    </div>
                                 </td>
                                 <td class="px-4 py-3">
                                     {{ record.company }}
