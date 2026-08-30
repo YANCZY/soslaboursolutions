@@ -99,7 +99,7 @@ const workspaceItems: NavItem[] = [
         </SidebarContent>
 
         <SidebarFooter>
-            <NavFooter :items="footerNavItems" />
+            <NavFooter :items="[]" />
             <NavUser />
         </SidebarFooter>
     </Sidebar>

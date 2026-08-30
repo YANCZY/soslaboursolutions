@@ -49,6 +49,7 @@ defineOptions({
         <Card>
             <AttendanceTable
                 :attendance-records="props.attendanceRecords"
+                :companies="props.companies"
                 @attendance-updated="refreshAttendance"
             />
         </Card>

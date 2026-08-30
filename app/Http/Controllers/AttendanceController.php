@@ -556,9 +556,44 @@ class AttendanceController extends Controller
     /**
      * Store a newly created resource in storage.
      */
-    public function store(Request $request)
+    public function store(Request $request): JsonResponse
     {
-        //
+        $validated = $request->validate([
+            'check_in_date' => ['required', 'date'],
+            'check_in_time' => ['required', 'date_format:H:i'],
+            'check_out_time' => ['required', 'date_format:H:i'],
+            'client_id' => [
+                'required',
+                'integer',
+                Rule::exists('client_user', 'client_id')->where(
+                    fn ($query) => $query->where('user_id', $request->user()->id)
+                ),
+            ],
+            'covering_for' => ['required', 'string', 'max:255'],
+        ]);
+
+        $checkIn = Carbon::parse($validated['check_in_date'].' '.$validated['check_in_time']);
+        $checkOut = Carbon::parse($validated['check_in_date'].' '.$validated['check_out_time']);
+
+        if ($checkOut->lessThanOrEqualTo($checkIn)) {
+            $checkOut->addDay();
+        }
+
+        $attendance = Attendance::query()->create([
+            'employee_id' => $request->user()->id,
+            'client_id' => $validated['client_id'],
+            'covering_for' => $validated['covering_for'],
+            'check_in_date' => $validated['check_in_date'],
+            'check_in_time' => $validated['check_in_time'],
+            'check_out_time' => $validated['check_out_time'],
+            'status' => 'checked_out',
+            'total_working_seconds' => (int) floor($checkOut->diffInSeconds($checkIn, true)),
+        ]);
+
+        return response()->json([
+            'message' => 'Shift added successfully.',
+            'attendance' => $attendance->fresh(),
+        ]);
     }
 
     /**

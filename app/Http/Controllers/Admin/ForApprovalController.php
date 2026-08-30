@@ -36,6 +36,7 @@ class ForApprovalController extends Controller
                     'id' => $attendance->id,
                     'date' => $attendance->check_in_date?->format('Y-m-d'),
                     'name' => trim(($attendance->user?->first_name ?? '') . ' ' . ($attendance->user?->last_name ?? '')),
+                    'covering_for' => $attendance->covering_for,
                     'company' => $attendance->client?->company_name ?? '-',
                     'check_in' => $attendance->check_in_time,
                     'check_out' => $attendance->check_out_time,

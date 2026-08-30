@@ -71,18 +71,6 @@ class ProfileController extends Controller
 
         $request->user()->save();
 
-        $request->user()->companyWorkDetails()->updateOrCreate(
-            ['client_id' => $validated['client_id']],
-            Arr::only($validated, [
-                'job_role',
-                'travel_allowance',
-                'travel_allowance_currency',
-                'salary',
-                'start_shift',
-                'end_shift',
-            ])
-        );
-
         Inertia::flash('toast', ['type' => 'success', 'message' => __('Profile updated.')]);
 
         return to_route('profile.edit', [

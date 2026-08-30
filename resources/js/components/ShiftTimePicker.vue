@@ -7,9 +7,11 @@ const props = withDefaults(defineProps<{
     name?: string;
     modelValue?: string | null;
     placeholder?: string;
+    disabled?: boolean;
 }>(), {
     modelValue: '',
     placeholder: 'Select time',
+    disabled: false,
 });
 
 const emit = defineEmits<{
@@ -41,6 +43,10 @@ const updatePlacement = async () => {
 };
 
 const toggleOpen = async () => {
+    if (props.disabled) {
+        return;
+    }
+
     open.value = !open.value;
 
     if (open.value) {
@@ -167,6 +173,7 @@ const updatePeriod = (period: 'AM' | 'PM') => {
             v-model="manualValue"
             type="text"
             :placeholder="placeholder"
+            :disabled="disabled"
             class="h-10 w-full rounded-md border bg-background px-3 pr-10 text-sm shadow-xs outline-none transition-[color,box-shadow] placeholder:text-muted-foreground focus-visible:ring-[3px]"
 :class="manualError ? 'border-destructive focus-visible:ring-destructive/20' : 'border-input focus-visible:border-ring focus-visible:ring-ring/50'"
             @blur="commitManualValue"
@@ -176,6 +183,7 @@ const updatePeriod = (period: 'AM' | 'PM') => {
         <button
             type="button"
             class="absolute top-0 right-0 flex h-10 w-10 items-center justify-center text-muted-foreground hover:text-foreground"
+            :disabled="disabled"
             @mousedown.prevent
             @click="toggleOpen"
         >

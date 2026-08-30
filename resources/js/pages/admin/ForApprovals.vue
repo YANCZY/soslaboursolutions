@@ -9,6 +9,7 @@ type AttendanceApprovalRecord = {
     id: number;
     date: string;
     name: string;
+    covering_for?: string | null;
     company: string;
     check_in: string | null;
     check_out: string | null;
