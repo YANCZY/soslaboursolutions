@@ -12,6 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('attendance', function (Blueprint $table) {
+            $table->index('employee_id', 'attendance_employee_id_index');
             $table->dropUnique('attendance_employee_id_check_in_date_unique');
         });
     }
@@ -22,6 +23,7 @@ return new class extends Migration
     public function down(): void
     {
          Schema::table('attendance', function (Blueprint $table) {
+            $table->dropIndex('attendance_employee_id_index');
             $table->unique(['employee_id', 'check_in_date']);
         });
     }
