@@ -1,11 +1,31 @@
 <script setup lang="ts">
 import { Link } from '@inertiajs/vue3';
+import { ref } from 'vue';
 import AppLogoIcon from '@/components/AppLogoIcon.vue';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
+import SecurityPolicy from '@/pages/auth/SecurityPolicy.vue';
+
+
 
 defineProps<{
     title?: string;
     description?: string;
 }>();
+
+const securityPolicyOpen = ref(false);
+
+const selectedPolicyTab = ref<'privacy' | 'terms' | 'security'>('privacy');
+
+const openPolicyModal = (tab: 'privacy' | 'terms' | 'security') => {
+    selectedPolicyTab.value = tab;
+    securityPolicyOpen.value = true;
+};
 </script>
 
 <template>
@@ -179,17 +199,92 @@ defineProps<{
                         >
                             {{ title }}
                         </h1>
-                        <p
-                            class="text-sm leading-6 text-muted-foreground"
-                            v-if="description"
+                        <div
+                            v-if="false"
+                            class="flex items-center justify-center gap-2 text-center text-sm text-muted-foreground"
                         >
-                            {{ description }}
-                        </p>
+                            <button
+                                type="button"
+                                class="font-medium underline-offset-4 hover:text-foreground hover:underline"
+                                @click="openPolicyModal('privacy')"
+                            >
+                                Privacy Policy
+                            </button>
+
+                            <span class="text-lg leading-none text-muted-foreground">•</span>
+
+                            <button
+                                type="button"
+                                class="font-medium underline-offset-4 hover:text-foreground hover:underline"
+                                @click="openPolicyModal('terms')"
+                            >
+                                Terms of Use
+                            </button>
+
+                            <span class="text-lg leading-none text-muted-foreground">•</span>
+
+                            <button
+                                type="button"
+                                class="font-medium underline-offset-4 hover:text-foreground hover:underline"
+                                @click="openPolicyModal('security')"
+                            >
+                                Security
+                            </button>
+                        </div>
                     </div>
                     <div class="mt-8">
                         <slot />
                     </div>
                 </div>
+
+                <div
+                    v-if="title === 'Log in to your account'"
+                    class="flex items-center justify-center gap-2 text-center text-sm text-muted-foreground"
+                >
+                    <button
+                        type="button"
+                        class="font-medium underline-offset-4 hover:text-foreground hover:underline"
+                        @click="openPolicyModal('privacy')"
+                    >
+                        Privacy Policy
+                    </button>
+
+                    <span class="text-lg leading-none text-muted-foreground">•</span>
+
+                    <button
+                        type="button"
+                        class="font-medium underline-offset-4 hover:text-foreground hover:underline"
+                        @click="openPolicyModal('terms')"
+                    >
+                        Terms of Use
+                    </button>
+
+                    <span class="text-lg leading-none text-muted-foreground">•</span>
+
+                    <button
+                        type="button"
+                        class="font-medium underline-offset-4 hover:text-foreground hover:underline"
+                        @click="openPolicyModal('security')"
+                    >
+                        Security
+                    </button>
+                </div>
+
+                <Dialog :open="securityPolicyOpen" @update:open="securityPolicyOpen = $event">
+                    <DialogContent
+                        class="grid max-h-[80vh] max-w-[calc(100%-2rem)] grid-rows-[auto_minmax(0,1fr)] overflow-hidden sm:max-w-3xl"
+                    >
+                        <DialogHeader>
+                            <DialogTitle>Privacy, Terms & Security</DialogTitle>
+                            <DialogDescription>
+                                Please review how SOS Labour Solutions handles your information,
+                                use of the portal, and account security.
+                            </DialogDescription>
+                        </DialogHeader>
+
+                        <SecurityPolicy v-model:active-tab="selectedPolicyTab" />
+                    </DialogContent>
+                </Dialog>
             </div>
         </div>
     </div>

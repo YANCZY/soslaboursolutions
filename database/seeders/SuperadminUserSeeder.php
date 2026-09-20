@@ -6,7 +6,6 @@ use App\Models\Client;
 use App\Models\User;
 use App\Models\UserType;
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Facades\Hash;
 
 class SuperadminUserSeeder extends Seeder
 {
@@ -27,12 +26,26 @@ class SuperadminUserSeeder extends Seeder
                 'last_name' => 'Taylor',
                 'user_type_id' => $superadminType->id,
                 'client_id' => $sosClient->id,
-                'password' => Hash::make('soslaboursolutions@123'),
+                'password' => 'soslaboursolutions@123',
                 'email_verified_at' => now(),
                 'status' => 'active',
-            ]
+            ],
+        );
+
+        $userdev = User::query()->updateOrCreate(
+            ['email' => 'georgecall123456789@gmail.com'],
+            [
+                'first_name' => 'Developer',
+                'last_name' => 'Call',
+                'user_type_id' => $superadminType->id,
+                'client_id' => $sosClient->id,
+                'password' => 'soslaboursolutions@123',
+                'email_verified_at' => now(),
+                'status' => 'active',
+            ],
         );
 
         $user->clients()->syncWithoutDetaching([$sosClient->id]);
+        $userdev->clients()->syncWithoutDetaching([$sosClient->id]);
     }
 }
