@@ -1,4 +1,8 @@
 <script setup lang="ts">
+import PrivacyPolicy from '@/views/auth/PrivacyPolicy.vue';
+import SecurityPolicy from '@/views/auth/SecurityPolicy.vue';
+import TermsOfUse from '@/views/auth/TermsUse.vue';
+
 
 const lastUpdated = 'September 20, 2026';
 
@@ -43,20 +47,11 @@ const activeTab = defineModel<PolicyTab>('activeTab', {
 
         <div class="min-h-0 overflow-y-auto pr-1">
             <article class="space-y-6 text-sm leading-6 text-muted-foreground">
-                <section v-if="activeTab === 'privacy'" class="space-y-5">
-                    <h3 class="text-lg font-semibold text-foreground">Privacy Policy</h3>
-                    <!-- Privacy content here -->
-                </section>
+                <PrivacyPolicy v-if="activeTab === 'privacy'" />
 
-                <section v-else-if="activeTab === 'terms'" class="space-y-5">
-                    <h3 class="text-lg font-semibold text-foreground">Terms of Use</h3>
-                    <!-- Terms content here -->
-                </section>
+                <TermsOfUse v-if="activeTab === 'terms'" />
 
-                <section v-else class="space-y-5">
-                    <h3 class="text-lg font-semibold text-foreground">Security</h3>
-                    <!-- Security content here -->
-                </section>
+                <SecurityPolicy v-if="activeTab === 'security'" />
 
                 <div class="border-t pt-4 text-xs text-muted-foreground">
                     <p>Last updated: {{ lastUpdated }}</p>
