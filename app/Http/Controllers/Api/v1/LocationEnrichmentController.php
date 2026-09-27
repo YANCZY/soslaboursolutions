@@ -13,11 +13,11 @@ class LocationEnrichmentController extends Controller
         StoreLocationEnrichmentRequest $request,
         LocationEnrichmentService $service,
     ): JsonResponse {
-        $payload = $service->handle($request->validated());
+        $result = $service->handle($request->validated());
 
         return response()->json([
             'message' => 'Location enrichment request received.',
-            'data' => $payload,
+            'data' => $result,
         ]);
     }
 }

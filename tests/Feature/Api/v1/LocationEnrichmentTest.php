@@ -1,55 +1,61 @@
 <?php
 
 use App\Services\LocationEnrichment\LocationEnrichmentService;
+use Laravel\Passport\ClientRepository;
+use Laravel\Passport\Passport;
 use Mockery\MockInterface;
+use Illuminate\Support\Facades\Http;
 
-beforeEach(function () {
-    config()->set(
-        'services.location_enrichment.hmac_secret',
-        'test-hmac-secret',
+function authenticateLocationEnrichmentClient(): void
+{
+    $client = app(ClientRepository::class)
+        ->createClientCredentialsGrantClient(
+            'Zoho CRM Location Enrichment Test',
+        );
+
+    Passport::actingAsClient(
+        $client,
+        ['location-enrichment:write'],
     );
-
-    config()->set(
-        'services.location_enrichment.hmac_tolerance_seconds',
-        300,
-    );
-});
-
-/**
- * @param array<string, mixed> $payload
- * @return array<string, string>
- */
-function locationEnrichmentHmacHeaders(
-    array $payload,
-    ?int $timestamp = null,
-): array {
-    $timestamp ??= now()->timestamp;
-    $body = json_encode($payload, JSON_THROW_ON_ERROR);
-
-    return [
-        'X-SOS-Timestamp' => (string) $timestamp,
-        'X-SOS-Signature' => hash_hmac(
-            'sha256',
-            $timestamp.'.'.$body,
-            config('services.location_enrichment.hmac_secret'),
-        ),
-    ];
 }
 
-test('it accepts a correctly signed location enrichment request', function () {
+function createRejectedExpiredJwt(): string
+{
+    $encode = static fn (array|string $value): string => rtrim(
+        strtr(
+            base64_encode(
+                is_array($value)
+                    ? json_encode($value, JSON_THROW_ON_ERROR)
+                    : $value,
+            ),
+            '+/',
+            '-_',
+        ),
+        '=',
+    );
+
+    return implode('.', [
+        $encode([
+            'alg' => 'RS256',
+            'typ' => 'JWT',
+        ]),
+        $encode([
+            'exp' => now()->subMinute()->timestamp,
+        ]),
+        $encode('invalid-signature'),
+    ]);
+}
+
+test('it accepts an authenticated client credentials request', function () {
+    authenticateLocationEnrichmentClient();
+
     $payload = [
         'id' => '572576000012345678',
         'city' => 'Brisbane',
         'suburb' => 'Fortitude Valley',
     ];
 
-    $response = $this->postJson(
-        '/api/v1/location-enrichment',
-        $payload,
-        locationEnrichmentHmacHeaders($payload),
-    );
-
-    $response
+    $this->postJson('/api/v1/location-enrichment', $payload)
         ->assertOk()
         ->assertJson([
             'message' => 'Location enrichment request received.',
@@ -57,54 +63,37 @@ test('it accepts a correctly signed location enrichment request', function () {
         ]);
 });
 
-test('it rejects a request without an hmac signature', function () {
-    $response = $this->postJson('/api/v1/location-enrichment', [
+test('it rejects a request without an access token', function () {
+    $this->postJson('/api/v1/location-enrichment', [
         'id' => '572576000012345678',
         'city' => 'Brisbane',
         'suburb' => 'Fortitude Valley',
-    ]);
+    ])->assertUnauthorized();
+});
 
-    $response
+test('it returns the token expired response', function () {
+    $expiredToken = createRejectedExpiredJwt();
+
+    $this->withToken($expiredToken)
+        ->postJson('/api/v1/location-enrichment', [
+            'id' => '572576000012345678',
+            'city' => 'Brisbane',
+            'suburb' => 'Fortitude Valley',
+        ])
         ->assertUnauthorized()
         ->assertExactJson([
-            'message' => 'Unauthorized request.',
-        ]);
-});
-
-test('it rejects an invalid hmac signature', function () {
-    $payload = [
-        'id' => '572576000012345678',
-        'city' => 'Brisbane',
-        'suburb' => 'Fortitude Valley',
-    ];
-
-    $headers = locationEnrichmentHmacHeaders($payload);
-    $headers['X-SOS-Signature'] = str_repeat('0', 64);
-
-    $this->postJson(
-        '/api/v1/location-enrichment',
-        $payload,
-        $headers,
-    )->assertUnauthorized();
-});
-
-test('it rejects an expired hmac timestamp', function () {
-    $payload = [
-        'id' => '572576000012345678',
-        'city' => 'Brisbane',
-        'suburb' => 'Fortitude Valley',
-    ];
-
-    $expiredTimestamp = now()->subMinutes(6)->timestamp;
-
-    $this->postJson(
-        '/api/v1/location-enrichment',
-        $payload,
-        locationEnrichmentHmacHeaders($payload, $expiredTimestamp),
-    )->assertUnauthorized();
+            'message' => 'Token expired.',
+            'error' => 'invalid_token',
+        ])
+        ->assertHeader(
+            'WWW-Authenticate',
+            'Bearer error="invalid_token", error_description="The access token expired"',
+        );
 });
 
 test('it does not call the service when the json is empty', function () {
+    authenticateLocationEnrichmentClient();
+
     $this->mock(
         LocationEnrichmentService::class,
         function (MockInterface $mock): void {
@@ -112,19 +101,82 @@ test('it does not call the service when the json is empty', function () {
         },
     );
 
-    $payload = [];
-
-    $response = $this->postJson(
-        '/api/v1/location-enrichment',
-        $payload,
-        locationEnrichmentHmacHeaders($payload),
-    );
-
-    $response
+    $this->postJson('/api/v1/location-enrichment', [])
         ->assertUnprocessable()
         ->assertJsonValidationErrors([
             'id',
             'city',
             'suburb',
         ]);
+});
+
+test('it excludes the origin from populated places within twenty kilometres', function () {
+    authenticateLocationEnrichmentClient();
+
+    config()->set('services.geoapify.api_key', 'test-api-key');
+    config()->set('services.geoapify.radius_meters', 20000);
+    config()->set('services.geoapify.country_code', 'au');
+    config()->set('services.geoapify.result_limit', 100);
+
+    Http::fake([
+        'api.geoapify.com/v1/geocode/search*' => Http::response([
+            'results' => [
+                [
+                    'city' => 'Brisbane',
+                    'formatted' => 'Brisbane, Queensland, Australia',
+                    'place_id' => 'brisbane-place-id',
+                    'lat' => -27.4698,
+                    'lon' => 153.0251,
+                ],
+            ],
+        ]),
+
+        'api.geoapify.com/v2/places*' => Http::response([
+            'features' => [
+                [
+                    'properties' => [
+                        'place_id' => 'fortitude-valley-place-id',
+                        'name' => 'Fortitude Valley',
+                        'suburb' => 'Fortitude Valley',
+                        'city' => 'Brisbane',
+                        'state' => 'Queensland',
+                        'country_code' => 'au',
+                        'distance' => 1700,
+                        'lat' => -27.4565,
+                        'lon' => 153.0345,
+                        'categories' => [
+                            'populated_place',
+                            'populated_place.suburb',
+                        ],
+                    ],
+                ],
+            ],
+        ]),
+    ]);
+
+    $response = $this->postJson(
+        '/api/v1/location-enrichment',
+        [
+            'id' => '572576000012345678',
+            'city' => 'Brisbane',
+            'state' => 'Queensland',
+            'suburb' => 'Fortitude Valley',
+        ],
+    );
+
+    $response
+        ->assertOk()
+        ->assertJsonPath('data.id', '572576000012345678')
+        ->assertJsonPath('data.origin.name', 'Brisbane')
+        ->assertJsonPath('data.radius_meters', 20000)
+        ->assertJsonPath(
+            'data.locations.0.name',
+            'Fortitude Valley',
+        )
+        ->assertJsonPath(
+            'data.locations.0.distance_meters',
+            1700,
+        );
+
+    Http::assertSentCount(2);
 });

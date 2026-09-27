@@ -25,6 +25,7 @@ class StoreLocationEnrichmentRequest extends FormRequest
         return [
             'id' => ['required', 'string', 'max:100'],
             'city' => ['required', 'string', 'max:255'],
+            'state' => ['nullable', 'string', 'max:255'],
             'suburb' => ['required', 'string', 'max:255'],
         ];
     }

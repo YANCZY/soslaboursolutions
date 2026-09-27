@@ -32,7 +32,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
         // Appearance
         Route::inertia('settings/appearance', 'settings/Appearance')->name('appearance.edit');
 
-
         // ROUTE SUPERADMIN , SOS ADMIN, CLIENT ADMIN
         Route::middleware(['user-type:Superadmin,SOS Admin,Client Admin'])->group(function () {
             Route::get('settings/company', [CompanySettingsController::class, 'index'])
@@ -43,6 +42,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
             Route::post('settings/employee', [EmployeeSettingsController::class, 'store'])
                 ->name('settings.employee.store');
+
+            Route::post(
+                'settings/employee/{user}/resend-invitation',
+                [EmployeeSettingsController::class, 'resendInvitation']
+            )
+                ->middleware('throttle:3,1')
+                ->name('settings.employee.resend-invitation');
 
             Route::patch('settings/employee/{user}/toggle-status', [EmployeeSettingsController::class, 'toggleStatus'])
                 ->name('settings.employee.toggle-status');
@@ -56,6 +62,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
             Route::post('settings/users', [UserSettingsController::class, 'store'])
                 ->name('settings.users.store');
+
+            Route::post(
+                'settings/users/{user}/resend-invitation',
+                [UserSettingsController::class, 'resendInvitation']
+            )
+                ->middleware('throttle:3,1')
+                ->name('settings.users.resend-invitation');
 
             Route::patch('settings/users/{user}', [UserSettingsController::class, 'update'])
                 ->name('settings.users.update');
