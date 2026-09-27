@@ -14,10 +14,10 @@ class AccountAccessNotification extends Notification
     /**
      * Create a new notification instance.
      */
-    public function __construct(public string $token,)
-    {
-        //
-    }
+    public function __construct(
+        public string $token,
+        public bool $isInvitation = false,
+    ) {}
 
     /**
      * Get the notification's delivery channels.
@@ -44,31 +44,31 @@ class AccountAccessNotification extends Notification
             'email' => $notifiable->getEmailForPasswordReset(),
         ], false));
 
-        $isPending = $notifiable->status === 'pending';
+        $isInvitation = $this->isInvitation;
 
         return (new MailMessage)
-            ->subject($isPending ? 'Set up your SOS Solutions account' : 'Reset your password')
+            ->subject($isInvitation ? 'Set up your SOS Labour Solutions account' : 'Reset your password')
             ->view('emails.account-access', [
                 'firstName' => $notifiable->first_name,
-                'title' => $isPending
-                    ? 'Welcome SOS Solutions Workspace'
+                'title' => $isInvitation
+                    ? 'Welcome SOS Labour Solutions Workspace'
                     : 'Reset your password',
-                'introText' => $isPending
+                'introText' => $isInvitation
                     ? 'We are glad to have you on board!'
                     : null,
-                'bodyText' => $isPending
+                'bodyText' => $isInvitation
                     ? 'Please click the button below to set up your account.'
                     : 'You are receiving this email because we received a password reset request for your account.',
                 'actionUrl' => $url,
-                'buttonText' => $isPending ? 'Set Up Account' : 'Reset Password',
-                'expiryText' => $isPending
+                'buttonText' => $isInvitation ? 'Set Up Account' : 'Reset Password',
+                'expiryText' => $isInvitation
                     ? 'This account setup link will expire in '.config('auth.passwords.'.config('auth.defaults.passwords').'.expire').' minutes.'
                     : 'This password reset link will expire in '.config('auth.passwords.'.config('auth.defaults.passwords').'.expire').' minutes.',
-                'noteText' => $isPending
+                'noteText' => $isInvitation
                     ? null
                     : 'If you did not request a password reset, no further action is required.',
-                'closingText' => $isPending ? 'Cheers,' : 'Regards,',
-                'brandName' => $isPending ? 'SOS Solutions' : 'SOS Labour Solutions',
+                'closingText' => $isInvitation ? 'Cheers,' : 'Regards,',
+                'brandName' => $isInvitation ? 'SOS Labour Solutions' : 'SOS Labour Solutions',
             ]);
     }
 

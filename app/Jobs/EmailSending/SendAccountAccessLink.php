@@ -6,7 +6,7 @@ use App\Models\User;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Password;
-use RuntimeException;
+use App\Notifications\AccountAccessNotification;
 
 class SendAccountAccessLink implements ShouldQueue
 {
@@ -24,12 +24,11 @@ class SendAccountAccessLink implements ShouldQueue
             return;
         }
 
-        $status = Password::sendResetLink([
-            'email' => $user->email,
-        ]);
+        $token = Password::broker()->createToken($user);
 
-        if ($status !== Password::RESET_LINK_SENT) {
-            throw new RuntimeException(__($status));
-        }
+        $user->notify(new AccountAccessNotification(
+            token: $token,
+            isInvitation: true,
+        ));
     }
 }

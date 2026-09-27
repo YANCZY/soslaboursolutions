@@ -80,9 +80,21 @@ class UserSettingsController extends Controller
 
     public function toggleStatus(User $user): RedirectResponse
     {
+        abort_unless(
+            in_array($user->status, ['active', 'inactive'], true),
+            422,
+            'Only active or inactive users can have their status changed.'
+        );
+
+        $wasInactive = $user->status === 'inactive';
+
         $user->update([
             'status' => $user->status === 'active' ? 'inactive' : 'active',
         ]);
+
+        if ($wasInactive) {
+            SendAccountAccessLink::dispatch($user->id);
+        }
 
         return back();
     }
@@ -122,6 +134,19 @@ class UserSettingsController extends Controller
 
 
         return to_route('settings.users.index', ['status' => 'pending']);
+    }
+
+    public function resendInvitation(User $user): RedirectResponse
+    {
+        abort_unless(
+            $user->status === 'pending',
+            422,
+            'Invitations can only be resent to pending users.'
+        );
+
+        SendAccountAccessLink::dispatch($user->id);
+
+        return back();
     }
 
     public function update(Request $request, User $user): RedirectResponse
