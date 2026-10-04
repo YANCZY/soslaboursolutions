@@ -16,7 +16,7 @@ class LocationEnrichmentController extends Controller
         $result = $service->handle($request->validated());
 
         return response()->json([
-            'message' => 'Location enrichment request received.',
+            'message' => 'success',
             'data' => $result,
         ]);
     }

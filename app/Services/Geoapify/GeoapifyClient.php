@@ -12,9 +12,6 @@ class GeoapifyClient
     private const PLACE_CATEGORIES = [
         'populated_place.city',
         'populated_place.suburb',
-        'populated_place.town',
-        'populated_place.village',
-        'populated_place.neighbourhood',
     ];
 
     /**
@@ -89,15 +86,12 @@ class GeoapifyClient
      * }>
      */
     public function nearbyPopulatedPlaces(
-        float $latitude,
-        float $longitude,
-        ?string $excludedPlaceId = null,
-        ?string $excludedPlaceName = null,
+    float $latitude,
+    float $longitude,
+    int $radius,
+    ?string $excludedPlaceId = null,
+    ?string $excludedPlaceName = null,
     ): array {
-        $radius = (int) config(
-            'services.geoapify.radius_meters',
-            20000,
-        );
 
         $response = $this->request()
             ->post('/v2/places', [
