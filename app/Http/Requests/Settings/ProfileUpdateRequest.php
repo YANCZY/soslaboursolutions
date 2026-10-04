@@ -22,18 +22,19 @@ class ProfileUpdateRequest extends FormRequest
         return [
             ...$this->profileRules($this->user()->id),
             'client_id' => [
-                'required',
+                'nullable',
                 'integer',
                 Rule::exists('client_user', 'client_id')->where(
                     fn($query) => $query->where('user_id', $this->user()->id)
                 ),
+                Rule::exists('clients', 'id')->where('is_active', true),
             ],
-            'job_role' => ['nullable', 'string', 'max:255'],
-            'travel_allowance' => ['required', 'numeric', 'min:0'],
-            'travel_allowance_currency' => ['required', 'string', 'size:3'],
-            'salary' => ['required', 'numeric', 'min:0'],
-            'start_shift' => ['nullable', 'required_with:end_shift', 'date_format:H:i'],
-            'end_shift' => ['nullable', 'required_with:start_shift', 'date_format:H:i'],
+            'job_role' => ['exclude_if:client_id,null', 'nullable', 'string', 'max:255'],
+            'travel_allowance' => ['exclude_if:client_id,null', 'required', 'numeric', 'min:0'],
+            'travel_allowance_currency' => ['exclude_if:client_id,null', 'required', 'string', 'size:3'],
+            'salary' => ['exclude_if:client_id,null', 'required', 'numeric', 'min:0'],
+            'start_shift' => ['exclude_if:client_id,null', 'nullable', 'required_with:end_shift', 'date_format:H:i'],
+            'end_shift' => ['exclude_if:client_id,null', 'nullable', 'required_with:start_shift', 'date_format:H:i'],
         ];
     }
 

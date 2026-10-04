@@ -87,7 +87,7 @@ class EmployeeSettingsController extends Controller
             'password' => Hash::make(Str::random(32)),
         ]);
 
-        SendAccountAccessLink::dispatch($user->id);
+        SendAccountAccessLink::dispatch($user->id)->afterCommit();
 
         return back();
     }
@@ -96,10 +96,42 @@ class EmployeeSettingsController extends Controller
     {
         abort_unless($user->client_id === $request->user()->client_id, 403);
 
+        abort_unless(
+            in_array($user->status, ['active', 'inactive'], true),
+            422,
+            'Only active or inactive users can have their status changed.'
+        );
+
+        $wasInactive = $user->status === 'inactive';
+
         $user->update([
-            'status' => $user->status === 'active' ? 'inactive' : 'active',
+            'status' => $wasInactive ? 'pending' : 'inactive',
         ]);
+
+        if ($wasInactive) {
+            SendAccountAccessLink::dispatch($user->id)->afterCommit();
+        }
+
+        return $wasInactive
+            ? to_route('settings.employee.index', ['status' => 'pending'])
+            : back();
+    }
+
+    public function resendInvitation(
+        User $user,
+        Request $request,
+    ): RedirectResponse {
+        abort_unless($user->client_id === $request->user()->client_id, 403);
+
+        abort_unless(
+            $user->status === 'pending',
+            422,
+            'Invitations can only be resent to pending users.'
+        );
+
+        SendAccountAccessLink::dispatch($user->id)->afterCommit();
 
         return back();
     }
+
 }

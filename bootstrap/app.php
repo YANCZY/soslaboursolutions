@@ -37,6 +37,7 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->alias([
             'user-type' => \App\Http\Middleware\EnsureUserHasAllowedType::class,
+            'active-company' => \App\Http\Middleware\EnsureCompanyIsActive::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

@@ -6,6 +6,7 @@ use App\Concerns\PasswordValidationRules;
 use App\Models\User;
 use Illuminate\Support\Facades\Validator;
 use Laravel\Fortify\Contracts\ResetsUserPasswords;
+use Illuminate\Validation\ValidationException;
 
 class ResetUserPassword implements ResetsUserPasswords
 {
@@ -18,6 +19,14 @@ class ResetUserPassword implements ResetsUserPasswords
      */
     public function reset(User $user, array $input): void
     {
+
+        if ($user->status === 'inactive') {
+            throw ValidationException::withMessages([
+                'email' => 'Your account is inactive. Contact an administrator to request reactivation.',
+            ]);
+        }
+
+
         Validator::make($input, [
             'password' => $this->passwordRules(),
         ])->validate();

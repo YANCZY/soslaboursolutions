@@ -13,7 +13,8 @@ use App\Http\Controllers\Admin\Settings\EmployeeSettingsController;
 Route::middleware(['auth'])->group(function () {
     Route::redirect('settings', '/settings/profile');
     Route::get('settings/profile', [ProfileController::class, 'edit'])->name('profile.edit');
-    Route::patch('settings/profile', [ProfileController::class, 'update'])->name('profile.update');
+    Route::patch('settings/profile', [ProfileController::class, 'update'])->middleware('active-company:input')
+                ->name('profile.update');
 });
 
 Route::middleware(['auth', 'verified'])->group(function () {
@@ -41,6 +42,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 ->name('settings.employee.index');
 
             Route::post('settings/employee', [EmployeeSettingsController::class, 'store'])
+                ->middleware('active-company:employee')
                 ->name('settings.employee.store');
 
             Route::post(
@@ -48,9 +50,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 [EmployeeSettingsController::class, 'resendInvitation']
             )
                 ->middleware('throttle:3,1')
+                ->middleware('active-company:employee')
                 ->name('settings.employee.resend-invitation');
 
             Route::patch('settings/employee/{user}/toggle-status', [EmployeeSettingsController::class, 'toggleStatus'])
+                ->middleware('active-company:employee')
                 ->name('settings.employee.toggle-status');
         });
 
@@ -61,6 +65,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 ->name('settings.users.index');
 
             Route::post('settings/users', [UserSettingsController::class, 'store'])
+                ->middleware('active-company:assignments')
                 ->name('settings.users.store');
 
             Route::post(
@@ -71,10 +76,16 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 ->name('settings.users.resend-invitation');
 
             Route::patch('settings/users/{user}', [UserSettingsController::class, 'update'])
+                ->middleware('active-company:assignments')
                 ->name('settings.users.update');
 
             Route::patch('settings/users/{user}/toggle-status', [UserSettingsController::class, 'toggleStatus'])
                 ->name('settings.users.toggle-status');
+
+            Route::delete('settings/company/{client}',[CompanySettingsController::class, 'destroy'])->name('settings.company.destroy');
+
+            Route::patch('settings/company/{client}/status', [CompanySettingsController::class, 'updateStatus'])->name('settings.company.status');
+
         });
 
 

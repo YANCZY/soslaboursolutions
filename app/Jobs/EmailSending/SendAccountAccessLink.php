@@ -20,7 +20,7 @@ class SendAccountAccessLink implements ShouldQueue
     {
         $user = User::query()->find($this->userId);
 
-        if (! $user) {
+        if (! $user || $user->status !== 'pending') {
             return;
         }
 

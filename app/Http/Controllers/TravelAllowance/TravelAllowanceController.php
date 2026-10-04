@@ -21,6 +21,7 @@ class TravelAllowanceController extends Controller
 
         $companies = $user
             ->clients()
+            ->where('clients.is_active', true)
             ->select('clients.id', 'clients.company_name')
             ->orderBy('company_name')
             ->get();

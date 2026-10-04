@@ -33,6 +33,7 @@ class StoreTravelAllowanceRequest extends FormRequest
                 Rule::exists('client_user', 'client_id')->where(
                     fn ($query) => $query->where('user_id', $this->user()->id)
                 ),
+                Rule::exists('clients', 'id')->where('is_active', true),
             ],
             'name' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
