@@ -12,6 +12,7 @@ use App\Support\PassportTokenInspector;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Illuminate\Validation\ValidationException;
 
 use Inertia\Middleware\EncryptHistory;
 
@@ -39,6 +40,27 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
+
+        $exceptions->shouldRenderJsonWhen(
+            fn (Request $request, \Throwable $exception): bool =>
+                $request->is('api/*') || $request->expectsJson()
+        );
+
+        $exceptions->render(
+            function (ValidationException $exception, Request $request) {
+                if (! $request->is('api/v1/location-enrichment')) {
+                    return null;
+                }
+
+                return response()->json([
+                    'message' => 'Invalid request. Check the errors below.',
+                    'error' => 'validation_failed',
+                    'errors' => $exception->errors(),
+                ], Response::HTTP_UNPROCESSABLE_ENTITY);
+            }
+        );
+
+
         $exceptions->render(
             function (
                 AuthenticationException $exception,

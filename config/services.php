@@ -42,13 +42,9 @@ return [
         ),
         'api_key' => env('GEOAPIFY_API_KEY'),
         'country_code' => env('GEOAPIFY_COUNTRY_CODE', 'au'),
-        'radius_meters' => (int) env(
-            'GEOAPIFY_RADIUS_METERS',
-            20000,
-        ),
         'result_limit' => (int) env(
             'GEOAPIFY_RESULT_LIMIT',
-            100,
+            60,
         ),
     ],
 
