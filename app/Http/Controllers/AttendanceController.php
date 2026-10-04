@@ -26,6 +26,7 @@ class AttendanceController extends Controller
 
         $companies = $user
         ->clients()
+            ->where('clients.is_active', true)
         ->select('clients.id', 'clients.company_name')
         ->orderBy('company_name')
         ->get()
@@ -98,6 +99,7 @@ class AttendanceController extends Controller
                 Rule::exists('client_user', 'client_id')->where(
                     fn($query) => $query->where('user_id', $request->user()->id)
                 ),
+                Rule::exists('clients', 'id')->where('is_active', true),
             ],
         ]);
 
@@ -568,8 +570,9 @@ class AttendanceController extends Controller
                 Rule::exists('client_user', 'client_id')->where(
                     fn ($query) => $query->where('user_id', $request->user()->id)
                 ),
+                Rule::exists('clients', 'id')->where('is_active', true),
             ],
-            'covering_for' => ['required', 'string', 'max:255'],
+            'covering_for' => ['nullable', 'string', 'max:255'],
         ]);
 
         $checkIn = Carbon::parse($validated['check_in_date'].' '.$validated['check_in_time']);
@@ -582,7 +585,7 @@ class AttendanceController extends Controller
         $attendance = Attendance::query()->create([
             'employee_id' => $request->user()->id,
             'client_id' => $validated['client_id'],
-            'covering_for' => $validated['covering_for'],
+            'covering_for' => $validated['covering_for'] ?? null,
             'check_in_date' => $validated['check_in_date'],
             'check_in_time' => $validated['check_in_time'],
             'check_out_time' => $validated['check_out_time'],

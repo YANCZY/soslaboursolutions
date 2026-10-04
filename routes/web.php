@@ -50,35 +50,48 @@ Route::middleware([
     Route::get('attendance', [AttendanceController::class, 'index'])
         ->name('attendance.index');
     Route::post('attendance', [AttendanceController::class, 'store'])
-    ->name('attendance.store');
+    ->middleware('active-company:attendance')
+        ->name('attendance.store');
     Route::post('attendance/check-in', [AttendanceController::class, 'checkIn'])
+        ->middleware('active-company:attendance')
         ->name('attendance.check-in');
     Route::post('attendance/lunch/start', [AttendanceController::class, 'startLunch'])
+        ->middleware('active-company:attendance')
         ->name('attendance.lunch.start');
     Route::post('attendance/lunch/end', [AttendanceController::class, 'endLunch'])
+        ->middleware('active-company:attendance')
         ->name('attendance.lunch.end');
     Route::post('attendance/check-out', [AttendanceController::class, 'checkOut'])
+        ->middleware('active-company:attendance')
         ->name('attendance.check-out');
     Route::post('attendance/forgot-check-out', [AttendanceController::class, 'storeForgotCheckOut'])
+        ->middleware('active-company:attendance')
         ->name('attendance.forgot-check-out');
     Route::put('attendance/{attendance}', [AttendanceController::class, 'updateAttendance'])
+        ->middleware('active-company:attendance')
         ->name('attendance.update');
     Route::delete('attendance/{attendance}', [AttendanceController::class, 'destroyAttendance'])
+        ->middleware('active-company:attendance')
         ->name('attendance.destroy');
 
 
     // ATTENDANCE & TRAVEL ALLOWANCE SUBMIT FOR APPROVAL
     Route::post('attendance/submit-for-approval', [AttendanceController::class, 'submitForApproval'])
+        ->middleware('active-company:attendance')
         ->name('attendance.submit-for-approval');
     Route::get('travel-allowance', [TravelAllowanceController::class, 'index'])
         ->name('travel-allowance.index');
     Route::post('travel-allowance', [TravelAllowanceController::class, 'store'])
+        ->middleware('active-company:travel')
         ->name('travel-allowance.store');
     Route::put('travel-allowance/{travelAllowance}', [TravelAllowanceController::class, 'update'])
+        ->middleware('active-company:travel')
         ->name('travel-allowance.update');
     Route::delete('travel-allowance/{travelAllowance}', [TravelAllowanceController::class, 'destroy'])
+        ->middleware('active-company:travel')
         ->name('travel-allowance.destroy');
     Route::post('travel-allowance/submit-for-approval', [TravelAllowanceController::class, 'submitForApproval'])
+        ->middleware('active-company:travel')
         ->name('travel-allowance.submit-for-approval');
 });
 
@@ -112,15 +125,19 @@ Route::middleware(['auth', 'verified', 'user-type:Superadmin,SOS Admin,Client Ad
         ->name('for-approvals.index');
 
     Route::patch('attendance/{attendance}/approve', [AttendanceController::class, 'approve'])
+        ->middleware('active-company:attendance')
         ->name('attendance.approve');
 
     Route::patch('attendance/{attendance}/reject', [AttendanceController::class, 'reject'])
+        ->middleware('active-company:attendance')
         ->name('attendance.reject');
 
     Route::patch('travel-allowance/{travelAllowance}/approve', [TravelAllowanceController::class, 'approve'])
+        ->middleware('active-company:travel')
         ->name('travel-allowance.approve');
 
     Route::patch('travel-allowance/{travelAllowance}/reject', [TravelAllowanceController::class, 'reject'])
+        ->middleware('active-company:travel')
         ->name('travel-allowance.reject');
 });
 

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Head, Link, router, useForm  } from '@inertiajs/vue3';
-import { Filter, Pencil, Plus, Search, User } from 'lucide-vue-next';
+import { Filter, Mail, Pencil, Plus, Search, User } from 'lucide-vue-next';
 import { computed, ref, watch } from 'vue';
 import { toast } from 'vue-sonner';
 import Heading from '@/components/Heading.vue';
@@ -324,6 +324,11 @@ const statusBadgeClass = (status: User['status']) => {
 };
 
 const openStatusConfirmation = (user: User) => {
+
+    if (user.status === 'pending') {
+        return;
+    }
+
     userToToggleStatus.value = user;
     statusConfirmationOpen.value = true;
 };
@@ -339,10 +344,15 @@ const confirmToggleStatus = () => {
     }
 
     const user = userToToggleStatus.value;
+
+    if (user.status === 'pending'){
+        return;
+    }
+
     const message =
         user.status === 'active'
             ? 'User has been deactivated.'
-            : 'User has been activated.';
+            : 'User is pending password setup. Invitation email queued.';
 
     router.patch(
         `/settings/users/${user.id}/toggle-status`,
@@ -352,6 +362,33 @@ const confirmToggleStatus = () => {
             onSuccess: () => {
                 toast.success(message);
                 cancelStatusConfirmation();
+            },
+        },
+    );
+};
+
+const resendingInvitationId = ref<number | null>(null);
+
+const resendInvitation = (user: User) => {
+    if (user.status !== 'pending' || resendingInvitationId.value !== null) {
+        return;
+    }
+
+    resendingInvitationId.value = user.id;
+
+    router.post(
+        `/settings/users/${user.id}/resend-invitation`,
+        {},
+        {
+            preserveScroll: true,
+            onSuccess: () => toast.success('Invitation email queued.'),
+            onError: (errors) => {
+                toast.error(
+                    Object.values(errors)[0] ?? 'Unable to resend invitation.',
+                );
+            },
+            onFinish: () => {
+                resendingInvitationId.value = null;
             },
         },
     );
@@ -647,6 +684,7 @@ class="h-8 gap-2 text-white hover:bg-red-700">
                                         </button>
 
                                         <button type="button"
+                                            v-if="user.status === 'active' || user.status === 'inactive'"
                                             class="inline-flex size-8 shrink-0 items-center justify-center rounded-md border transition-all"
                                             :class="user.status === 'active'
                                                 ? 'border-border bg-muted text-foreground shadow-inner ring-1 ring-border'
@@ -655,6 +693,18 @@ class="h-8 gap-2 text-white hover:bg-red-700">
                                             :aria-label="user.status === 'active' ? 'Deactivate user' : 'Activate user'"
                                             @click="openStatusConfirmation(user)">
                                             <User class="size-4" />
+                                        </button>
+
+                                        <button
+                                            v-if="user.status === 'pending'"
+                                            type="button"
+                                            class="inline-flex size-8 shrink-0 items-center justify-center rounded-md border border-border bg-background text-muted-foreground shadow-sm transition-all hover:bg-muted/60 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                                            title="Resend invitation email"
+                                            :aria-label="`Resend invitation email to ${user.first_name} ${user.last_name}`"
+                                            :disabled="resendingInvitationId !== null"
+                                            @click="resendInvitation(user)"
+                                        >
+                                            <Mail class="size-4" />
                                         </button>
                                     </div>
                                 </td>
@@ -687,14 +737,29 @@ class="h-8 gap-2 text-white hover:bg-red-700">
                                     {{ statusLabel(user.status) }}
                                 </span>
 
-                                <button type="button"
+                                <button
+                                    v-if="user.status === 'pending'"
+                                    type="button"
+                                    class="inline-flex size-8 shrink-0 items-center justify-center rounded-md border border-border bg-background text-muted-foreground shadow-sm transition-all hover:bg-muted/60 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                                    title="Resend invitation email"
+                                    :aria-label="`Resend invitation email to ${user.first_name} ${user.last_name}`"
+                                    :disabled="resendingInvitationId !== null"
+                                    @click="resendInvitation(user)"
+                                >
+                                    <Mail class="size-4" />
+                                </button>
+
+                                <button
+                                    v-if="user.status === 'active' || user.status === 'inactive'"
+                                    type="button"
                                     class="inline-flex size-8 items-center justify-center rounded-md border transition-all"
                                     :class="user.status === 'active'
-                                            ? 'border-border bg-muted text-foreground shadow-inner ring-1 ring-border'
-                                            : 'border-border bg-background text-muted-foreground shadow-sm hover:bg-muted/60 hover:text-foreground'
-                                        " :title="user.status === 'active' ? 'Deactivate user' : 'Activate user'"
-                                    :aria-label="user.status === 'active' ? 'Deactivate user' : 'Activate user'"
-                                    @click="openStatusConfirmation(user)">
+                                        ? 'border-border bg-muted text-foreground shadow-inner ring-1 ring-border'
+                                        : 'border-border bg-background text-muted-foreground shadow-sm hover:bg-muted/60 hover:text-foreground'"
+                                    :title="user.status === 'active' ? 'Deactivate user' : 'Reactivate user'"
+                                    :aria-label="user.status === 'active' ? 'Deactivate user' : 'Reactivate user'"
+                                    @click="openStatusConfirmation(user)"
+                                >
                                     <User class="size-4" />
                                 </button>
                             </div>

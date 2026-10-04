@@ -24,11 +24,15 @@ class ProfileController extends Controller
 
         $companies = $request->user()
             ->clients()
+            ->where('clients.is_active', true)
             ->select('clients.id', 'clients.company_name')
             ->orderBy('company_name')
             ->get();
 
-        $selectedCompanyId = $request->integer('client_id') ?: $companies->first()?->id;
+        $requestedCompanyId = $request->integer('client_id');
+        $selectedCompanyId = $companies->contains('id', $requestedCompanyId)
+            ? $requestedCompanyId
+            : $companies->first()?->id;
 
         $workDetail = $selectedCompanyId
             ? $request->user()
