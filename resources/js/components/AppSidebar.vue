@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Link, usePage } from '@inertiajs/vue3';
-import { Building2, Calendar1Icon, ClipboardCheck, Contact2, LayoutGrid, Wallet } from 'lucide-vue-next';
+import {  Calendar1Icon, ClipboardCheck,  LayoutGrid, Wallet } from 'lucide-vue-next';
 import { computed } from 'vue';
 import AppLogo from '@/components/AppLogo.vue';
 import NavFooter from '@/components/NavFooter.vue';
@@ -22,10 +22,6 @@ const isContractor = computed(() => page.props.auth.user_type === 'Contractor');
 
 const userType = computed(() => page.props.auth.user_type);
 
-const canViewPeople = computed(() =>
-    ['Superadmin', 'SOS Admin', 'SOS Standard'].includes(userType.value ?? ''),
-);
-
 const canApprove = computed(() =>
     ['Superadmin', 'SOS Admin', 'Client Admin'].includes(userType.value ?? ''),
 );
@@ -35,19 +31,6 @@ const mainNavItems: NavItem[] = [
         title: 'Dashboard',
         href: '/dashboard',
         icon: LayoutGrid,
-    },
-];
-
-const peopleItems: NavItem[] = [
-    {
-        title: 'Clients',
-        href: '/clients',
-        icon: Building2
-    },
-    {
-        title: 'Contractors',
-        href: '/contractors',
-        icon: Contact2
     },
 ];
 
@@ -89,7 +72,6 @@ const workspaceItems: NavItem[] = [
         <SidebarContent>
             <NavMain
                 :items="isContractor ? [] : mainNavItems"
-                :people-items="canViewPeople ? peopleItems : []"
                 :workspace-items="
                     workspaceItems.filter((item) =>
                         item.title !== 'For Approvals' || canApprove
