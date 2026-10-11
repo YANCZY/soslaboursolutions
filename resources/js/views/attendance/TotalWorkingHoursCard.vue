@@ -1,18 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { Card, CardContent } from '@/components/ui/card';
-
-type Attendance = {
-    id: number;
-    check_in_date: string;
-    status: 'checked_in' | 'lunch_break' | 'checked_out';
-    approval_status: 'pending' | 'approved' | 'rejected' | null;
-    check_in_time: string | null;
-    check_out_time: string | null;
-    lunch_start_time: string | null;
-    lunch_end_time: string | null;
-    total_working_seconds: number;
-};
+import type { Attendance } from '@/types/attendance';
 
 const props = defineProps<{
     weeklyAttendance: Attendance[];

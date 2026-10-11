@@ -12,6 +12,7 @@ use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
 use Inertia\Response;
+use App\Services\UserLocationService;
 
 class ProfileController extends Controller
 {
@@ -22,34 +23,37 @@ class ProfileController extends Controller
     {
         $profile = $request->user()->profile()->firstOrCreate([]);
 
-        $companies = $request->user()
-            ->clients()
-            ->where('clients.is_active', true)
-            ->select('clients.id', 'clients.company_name')
-            ->orderBy('company_name')
-            ->get();
+       $locations = app(UserLocationService::class)
+            ->options($request->user());
 
-        $requestedCompanyId = $request->integer('client_id');
-        $selectedCompanyId = $companies->contains('id', $requestedCompanyId)
-            ? $requestedCompanyId
-            : $companies->first()?->id;
+        $requestedLocationId = $request->integer(
+            'location_assignment_id',
+        );
 
-        $workDetail = $selectedCompanyId
+        $selectedLocation = $locations->firstWhere(
+            'id',
+            $requestedLocationId,
+        ) ?? $locations->first();
+
+        $selectedLocationId = $selectedLocation['id'] ?? null;
+        $selectedCompanyId = $selectedLocation['client_id'] ?? null;
+
+        $workDetail = $selectedLocation
             ? $request->user()
-            ->companyWorkDetails()
-            ->with('client:id,company_name')
-            ->where('client_id', $selectedCompanyId)
-            ->first()
+                ->companyWorkDetails()
+                ->where('client_id', $selectedLocation['client_id'])
+                ->where('site_id', $selectedLocation['site_id'])
+                ->first()
             : null;
 
         return Inertia::render('settings/Profile', [
             'mustVerifyEmail' => $request->user() instanceof MustVerifyEmail,
             'status' => $request->session()->get('status'),
             'profile' => $profile,
-            'companies' => $companies,
+            'locations' => $locations,
             'workDetail' => $workDetail,
             'workDetails' => $request->user()->companyWorkDetails()->get(),
-            'selectedCompanyId' => $selectedCompanyId,
+            'selectedLocationId' => $selectedLocationId,
         ]);
     }
 
@@ -78,7 +82,8 @@ class ProfileController extends Controller
         Inertia::flash('toast', ['type' => 'success', 'message' => __('Profile updated.')]);
 
         return to_route('profile.edit', [
-            'client_id' => $validated['client_id'],
+            'location_assignment_id' =>
+                $validated['location_assignment_id'] ?? null,
         ]);
     }
 

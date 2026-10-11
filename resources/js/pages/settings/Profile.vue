@@ -7,7 +7,7 @@ import DeleteUser from '@/components/DeleteUser.vue';
 import Heading from '@/components/Heading.vue';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-
+import type { LocationOption } from '@/types/location';
 
 // =======
 import EditProfileForm from '@/views/settings/profile/EditProfileForm.vue';
@@ -38,10 +38,10 @@ type Props = {
         travel_allowance_currency?: string | null;
         salary?: string | number | null;
     };
-    companies: Company[];
+    locations: LocationOption[];
     workDetail?: WorkDetail | null;
     workDetails: WorkDetail[];
-    selectedCompanyId?: number | null;
+    selectedLocationId?: number | null;
 };
 
 const props = defineProps<Props>();
@@ -65,8 +65,10 @@ const page = usePage();
 const user = computed(() => page.props.auth.user);
 const isEditing = ref(false);
 
-const selectedCompany = computed(() =>
-    props.companies.find((company) => company.id === props.selectedCompanyId) ?? null,
+const selectedLocation = computed(() =>
+    props.locations.find(
+        (location) => location.id === props.selectedLocationId,
+    ) ?? null,
 );
 </script>
 
@@ -112,7 +114,7 @@ const selectedCompany = computed(() =>
                 <div class="grid gap-2">
                     <Label>Company</Label>
                     <div class="rounded-md border px-3 py-2 text-sm">
-                        {{ props.workDetail?.company?.company_name || selectedCompany?.company_name || '-' }}
+                        {{ selectedLocation?.label ?? '' }}
                     </div>
                 </div>
 
@@ -138,8 +140,8 @@ const selectedCompany = computed(() =>
             v-model:open="isEditing"
             :user="user"
             :profile="props.profile"
-:companies="props.companies"
-            :work-details="props.workDetails" :selected-company-id="props.selectedCompanyId"
+            :locations="props.locations"
+            :selected-location-id="props.selectedLocationId"
             :must-verify-email="mustVerifyEmail"
             :status="status"
             @saved="isEditing = false"

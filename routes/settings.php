@@ -13,8 +13,10 @@ use App\Http\Controllers\Admin\Settings\EmployeeSettingsController;
 Route::middleware(['auth'])->group(function () {
     Route::redirect('settings', '/settings/profile');
     Route::get('settings/profile', [ProfileController::class, 'edit'])->name('profile.edit');
-    Route::patch('settings/profile', [ProfileController::class, 'update'])->middleware('active-company:input')
-                ->name('profile.update');
+    Route::patch(
+    'settings/profile',
+    [ProfileController::class, 'update'],
+)->name('profile.update');
 });
 
 Route::middleware(['auth', 'verified'])->group(function () {
@@ -76,7 +78,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 ->name('settings.users.resend-invitation');
 
             Route::patch('settings/users/{user}', [UserSettingsController::class, 'update'])
-                ->middleware('active-company:assignments')
                 ->name('settings.users.update');
 
             Route::patch('settings/users/{user}/toggle-status', [UserSettingsController::class, 'toggleStatus'])
@@ -85,6 +86,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
             Route::delete('settings/company/{client}',[CompanySettingsController::class, 'destroy'])->name('settings.company.destroy');
 
             Route::patch('settings/company/{client}/status', [CompanySettingsController::class, 'updateStatus'])->name('settings.company.status');
+
+            Route::patch('settings/company/sites/{site}/status', [CompanySettingsController::class, 'updateSiteStatus'],)->name('settings.company.sites.status');
 
         });
 

@@ -9,6 +9,7 @@ use Inertia\Inertia;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
+use App\Models\Site;
 
 class CompanySettingsController extends Controller
 {
@@ -18,7 +19,22 @@ class CompanySettingsController extends Controller
 
         return Inertia::render('admin/settings/company/index', [
             'companies' => Client::query()
-                ->select('id', 'company_name', 'trade', 'industry', 'website', 'company_address_state','is_active')
+                ->select([
+                    'id',
+                    'company_name',
+                    'company_type',
+                    'trade',
+                    'industry',
+                    'industry_description',
+                    'phone',
+                    'website',
+                    'company_address',
+                    'company_address_2',
+                    'company_address_city',
+                    'company_address_state',
+                    'company_address_country',
+                    'is_active',
+                ])
                 ->withExists(Client::RELATED_RECORDS)
                 ->when(
                     $request->user()->userType?->user_type_name === 'Client Admin',
@@ -51,6 +67,30 @@ class CompanySettingsController extends Controller
                     return $company;
                 }),
 
+                'sites' => Site::query()
+                ->select([
+                    'id',
+                    'client_id',
+                    'site_name',
+                    'is_active',
+                    'street',
+                    'city',
+                    'state',
+                    'postcode',
+                    'country',
+                ])
+                ->with('company:id,company_name')
+                ->when(
+                    $request->user()->userType?->user_type_name === 'Client Admin',
+                    fn ($query) => $query->where(
+                        'client_id',
+                        $request->user()->client_id,
+                    ),
+                )
+                ->orderBy('site_name')
+                ->orderBy('id')
+                ->get(),
+
             'filters' => [
                 'search' => $search,
             ],
@@ -78,6 +118,18 @@ class CompanySettingsController extends Controller
 
             $company->delete();
         });
+
+        return back();
+    }
+
+    public function updateSiteStatus(Request $request, Site $site,): RedirectResponse
+    {
+        $validated = $request->validate([
+            'is_active' => ['required', 'boolean'],
+        ]);
+
+        $site->is_active = $validated['is_active'];
+        $site->save();
 
         return back();
     }

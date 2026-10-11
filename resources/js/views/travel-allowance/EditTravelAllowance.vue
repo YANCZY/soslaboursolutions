@@ -16,10 +16,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
-type Company = {
-    id: number;
-    company_name: string;
-};
+import type { LocationOption } from '@/types/location';
 
 type WorkDetail = {
     client_id: number;
@@ -32,6 +29,7 @@ type TravelAllowance = {
     date: string;
     name: string;
     client_id: number;
+    site_id: number | null;
     company: string;
     description: string;
     rate: number;
@@ -42,7 +40,7 @@ type TravelAllowance = {
 const props = defineProps<{
     open: boolean;
     travelAllowance: TravelAllowance | null;
-    companies: Company[];
+    locations: LocationOption[];
     workDetails: WorkDetail[];
 }>();
 
@@ -53,7 +51,7 @@ const emit = defineEmits<{
 const form = useForm({
     date: '',
     name: '',
-    client_id: null as number | null,
+    location_assignment_id: null as number | null,
     company_search: '',
     description: '',
     rate: '',
@@ -65,15 +63,18 @@ const companyLookupOpen = ref(false);
 const companyError = ref('');
 
 watch(
-    () => props.travelAllowance,
-    (allowance) => {
-        if (!allowance) {
+    [
+        () => props.open,
+        () => props.travelAllowance,
+    ],
+    ([isOpen, allowance]) => {
+        if (!isOpen || !allowance) {
             return;
         }
 
         form.date = allowance.date;
         form.name = allowance.name;
-        form.client_id = allowance.client_id;
+        form.location_assignment_id = null;
         form.company_search = allowance.company;
         form.description = allowance.description ?? '';
         form.rate = String(allowance.rate ?? '');
@@ -100,29 +101,20 @@ watch(
 const filteredCompanies = computed(() => {
     const value = form.company_search.trim().toLowerCase();
 
-    return props.companies.filter((company) =>
-        !value || company.company_name.toLowerCase().includes(value),
+    return props.locations.filter(
+        (location) =>
+            !value || location.label.toLowerCase().includes(value),
     );
 });
 
-const selectedWorkDetail = computed(() =>
-    props.workDetails.find((detail) => detail.client_id === form.client_id) ?? null,
-);
+const selectCompany = (company: LocationOption) => {
+    form.location_assignment_id = company.id;
+    form.company_search = company.label;
 
-watch(
-    () => form.client_id,
-    () => {
-        form.rate =
-            selectedWorkDetail.value?.travel_allowance !== null &&
-            selectedWorkDetail.value?.travel_allowance !== undefined
-                ? String(selectedWorkDetail.value.travel_allowance)
-                : '';
-    },
-);
+    form.rate = company.travel_allowance == null
+        ? ''
+        : String(company.travel_allowance);
 
-const selectCompany = (company: Company) => {
-    form.client_id = company.id;
-    form.company_search = company.company_name;
     companyLookupOpen.value = false;
     companyError.value = '';
 };
@@ -148,12 +140,6 @@ const submit = () => {
     companyError.value = '';
 
     if (!props.travelAllowance) {
-        return;
-    }
-
-    if (!form.client_id) {
-        companyError.value = 'Company is required.';
-
         return;
     }
 
@@ -239,10 +225,10 @@ const submit = () => {
                                         class="flex w-full items-center rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent hover:text-accent-foreground"
                                         @mousedown.prevent="selectCompany(company)"
                                     >
-                                        {{ company.company_name }}
+                                        {{ company.label }}
                                     </button>
                                 </div>
-                                <InputError :message="companyError || form.errors.client_id" />
+                                <InputError :message="companyError || form.errors.location_assignment_id" />
                             </div>
                         </div>
 

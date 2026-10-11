@@ -11,10 +11,11 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 
-
+import type { LocationOption } from '@/types/location';
 import AddTravelAllowance from '@/views/travel-allowance/AddTravelAllowance.vue';
 import EditTravelAllowance from '@/views/travel-allowance/EditTravelAllowance.vue';
 import TravelAllowanceListView from '@/views/travel-allowance/TravelAllowanceListView.vue';
+
 
 type TravelAllowance = {
     id: number;
@@ -26,11 +27,7 @@ type TravelAllowance = {
     rate: number;
     quantity: number;
     amount: number;
-};
-
-type Company = {
-    id: number;
-    company_name: string;
+    site_id: number | null;
 };
 
 type WorkDetail = {
@@ -52,12 +49,12 @@ defineOptions({
 const props = withDefaults(
     defineProps<{
         travelAllowances?: TravelAllowance[];
-        companies?: Company[];
+        locations?: LocationOption[];
         workDetails?: WorkDetail[];
     }>(),
     {
         travelAllowances: () => [],
-        companies: () => [],
+        locations: () => [],
         workDetails: () => [],
     },
 );
@@ -107,14 +104,14 @@ const deleteTravelAllowance = () => {
 
         <AddTravelAllowance
             :open="addTravelAllowanceOpen"
-            :companies="props.companies"
+            :locations="props.locations"
             :work-details="props.workDetails"
             @update:open="addTravelAllowanceOpen = $event"
         />
         <EditTravelAllowance
             :open="editTravelAllowanceOpen"
             :travel-allowance="selectedTravelAllowance"
-            :companies="props.companies"
+            :locations="props.locations"
             :work-details="props.workDetails"
             @update:open="editTravelAllowanceOpen = $event"
         />

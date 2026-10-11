@@ -95,6 +95,11 @@ class User extends Authenticatable implements MustVerifyEmail
         return $this->belongsToMany(Client::class)->withTimestamps();
     }
 
+    public function locationAssignments(): HasMany
+    {
+        return $this->hasMany(UserLocationAssignment::class);
+    }
+
 
     public function profile(): HasOne
     {

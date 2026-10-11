@@ -15,11 +15,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-
-type Company = {
-    id: number;
-    company_name: string;
-};
+import type { LocationOption } from '@/types/location';
 
 type WorkDetail = {
     client_id: number;
@@ -29,7 +25,7 @@ type WorkDetail = {
 
 const props = defineProps<{
     open: boolean;
-    companies: Company[];
+    locations: LocationOption[];
     workDetails: WorkDetail[];
 }>();
 
@@ -59,7 +55,7 @@ const fullName = computed(() =>
 const form = useForm({
     date: today.value,
     name: fullName.value,
-    client_id: null as number | null,
+    location_assignment_id: null as number | null,
     company_search: '',
     description: '',
     rate: '',
@@ -79,7 +75,7 @@ watch(
             form.defaults({
                 date: today.value,
                 name: fullName.value,
-                client_id: null,
+                location_assignment_id: null,
                 company_search: '',
                 description: '',
                 rate: '',
@@ -95,17 +91,21 @@ watch(
 const filteredCompanies = computed(() => {
     const value = form.company_search.trim().toLowerCase();
 
-    return props.companies.filter((company) =>
-        !value || company.company_name.toLowerCase().includes(value),
+    return props.locations.filter(
+        (location) =>
+            !value || location.label.toLowerCase().includes(value),
     );
 });
 
 const selectedWorkDetail = computed(() =>
-    props.workDetails.find((detail) => detail.client_id === form.client_id) ?? null,
+    props.locations.find(
+        (location) =>
+            location.id === form.location_assignment_id,
+    ) ?? null,
 );
 
 watch(
-    () => form.client_id,
+    () => form.location_assignment_id,
     () => {
         form.rate =
             selectedWorkDetail.value?.travel_allowance !== null &&
@@ -115,9 +115,14 @@ watch(
     },
 );
 
-const selectCompany = (company: Company) => {
-    form.client_id = company.id;
-    form.company_search = company.company_name;
+const selectCompany = (company: LocationOption) => {
+    form.location_assignment_id = company.id;
+    form.company_search = company.label;
+
+    form.rate = company.travel_allowance == null
+        ? ''
+        : String(company.travel_allowance);
+
     companyLookupOpen.value = false;
     companyError.value = '';
 };
@@ -142,8 +147,8 @@ watch(amount, (value) => {
 const submit = () => {
     companyError.value = '';
 
-    if (!form.client_id) {
-        companyError.value = 'Company is required.';
+    if (!form.location_assignment_id) {
+        companyError.value = 'Company or site is required.';
 
         return;
     }
@@ -231,10 +236,10 @@ const submit = () => {
                                         class="flex w-full items-center rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent hover:text-accent-foreground"
                                         @mousedown.prevent="selectCompany(company)"
                                     >
-                                        {{ company.company_name }}
+                                        {{ company.label }}
                                     </button>
                                 </div>
-                                <InputError :message="companyError || form.errors.client_id" />
+                                <InputError :message="companyError || form.errors.location_assignment_id" />
                             </div>
                         </div>
 

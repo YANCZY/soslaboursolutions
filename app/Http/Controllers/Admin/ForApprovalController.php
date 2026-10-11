@@ -8,6 +8,7 @@ use App\Models\Attendance;
 use Inertia\Inertia;
 use Inertia\Response;
 use App\Models\TravelAllowance;
+use App\Services\UserLocationService;
 
 class ForApprovalController extends Controller
 {
@@ -25,6 +26,7 @@ class ForApprovalController extends Controller
             ->with([
                 'user:id,first_name,last_name',
                 'client:id,company_name',
+                'site:id,site_name',
             ])
             ->whereNotNull('approval_status')
             ->whereIn('client_id', $clientIds)
@@ -37,7 +39,10 @@ class ForApprovalController extends Controller
                     'date' => $attendance->check_in_date?->format('Y-m-d'),
                     'name' => trim(($attendance->user?->first_name ?? '') . ' ' . ($attendance->user?->last_name ?? '')),
                     'covering_for' => $attendance->covering_for,
-                    'company' => $attendance->client?->company_name ?? '-',
+                    'company' => UserLocationService::label(
+                        $attendance->client,
+                        $attendance->site,
+                    ) ?: '-',
                     'check_in' => $attendance->check_in_time,
                     'check_out' => $attendance->check_out_time,
                     'total_work_hours' => $attendance->total_working_seconds,
@@ -50,6 +55,7 @@ class ForApprovalController extends Controller
                 ->with([
                     'user:id,first_name,last_name',
                     'client:id,company_name',
+                    'site:id,site_name',
                 ])
                 ->whereNotNull('approval_status')
                 ->whereIn('client_id', $clientIds)
@@ -61,7 +67,10 @@ class ForApprovalController extends Controller
                         'id' => $travelAllowance->id,
                         'date' => $travelAllowance->date,
                         'name' => $travelAllowance->name,
-                        'company' => $travelAllowance->client?->company_name ?? '-',
+                        'company' => UserLocationService::label(
+                            $travelAllowance->client,
+                            $travelAllowance->site,
+                        ) ?: '-',
                         'description' => $travelAllowance->description ?? '-',
                         'rate' => (float) $travelAllowance->rate,
                         'quantity' => (int) $travelAllowance->quantity,

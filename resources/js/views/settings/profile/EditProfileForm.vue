@@ -16,6 +16,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { send } from '@/routes/verification';
+import type { LocationOption } from '@/types/location';
 
 
 type UserProfile = {
@@ -36,30 +37,14 @@ type ProfileDetails = {
     end_shift?: string | null;
 };
 
-type Company = {
-    id: number;
-    company_name: string;
-};
-
-type WorkDetail = {
-    client_id: number;
-    job_role?: string | null;
-    salary?: string | number | null;
-    travel_allowance?: string | number | null;
-    travel_allowance_currency?: string | null;
-    start_shift?: string | null;
-    end_shift?: string | null;
-};
-
 const props = defineProps<{
     open: boolean;
     user: UserProfile;
     profile: ProfileDetails;
-    companies: Company[];
+    locations: LocationOption[];
+    selectedLocationId?: number | null;
     mustVerifyEmail: boolean;
     status?: string;
-    workDetails: WorkDetail[];
-    selectedCompanyId?: number | null;
 }>();
 
 const emit = defineEmits<{
@@ -67,95 +52,108 @@ const emit = defineEmits<{
     (e: 'saved'): void;
 }>();
 
-const selectedCompanyId = props.selectedCompanyId ?? props.companies[0]?.id ?? null;
+const companySearch = ref('');
+const selectedCompanyLabel = ref('');
+const companyLookupOpen = ref(false);
 
-const selectedCompany = props.companies.find(
-    (company) => company.id === selectedCompanyId,
+const form = useForm({
+    first_name: '',
+    last_name: '',
+    email: '',
+    phone: '',
+    mobile: '',
+    location_assignment_id: null as number | null,
+    job_role: '',
+    salary: '',
+    travel_allowance: '',
+    travel_allowance_currency: '',
+    start_shift: '',
+    end_shift: '',
+});
+
+const populateWorkFields = (location: LocationOption | null) => {
+    form.job_role = location?.job_role ?? '';
+    form.salary = location?.salary == null
+        ? ''
+        : String(location.salary);
+    form.travel_allowance = location?.travel_allowance == null
+        ? ''
+        : String(location.travel_allowance);
+    form.travel_allowance_currency =
+        location?.travel_allowance_currency ?? '';
+    form.start_shift = location?.start_shift ?? '';
+    form.end_shift = location?.end_shift ?? '';
+};
+
+const populateForm = () => {
+    const location = props.locations.find(
+        (item) => item.id === props.selectedLocationId,
+    ) ?? props.locations[0] ?? null;
+
+    form.first_name = props.user.first_name ?? '';
+    form.last_name = props.user.last_name ?? '';
+    form.email = props.user.email ?? '';
+    form.phone = props.user.phone ?? '';
+    form.mobile = props.user.mobile ?? '';
+    form.location_assignment_id = location?.id ?? null;
+
+    selectedCompanyLabel.value = location?.label ?? '';
+    companySearch.value = selectedCompanyLabel.value;
+
+    populateWorkFields(location);
+    companyLookupOpen.value = false;
+    form.clearErrors();
+};
+
+watch(
+    () => props.open,
+    (isOpen) => {
+        if (isOpen) populateForm();
+    },
+    { immediate: true },
 );
 
-const selectedCompanyLabel = ref(selectedCompany?.company_name ?? '');
-const companySearch = ref(selectedCompanyLabel.value);
-const companyLookupOpen = ref(false);
+const filteredCompanies = computed(() => {
+    const value = companySearch.value.trim().toLowerCase();
+    const selectedValue =
+        selectedCompanyLabel.value.trim().toLowerCase();
+
+    const searchValue =
+        form.location_assignment_id && value === selectedValue
+            ? ''
+            : value;
+
+    return props.locations.filter((location) =>
+        location.id !== form.location_assignment_id
+        && (
+            !searchValue
+            || location.label.toLowerCase().includes(searchValue)
+        ),
+    );
+});
+
+watch(companySearch, (value) => {
+    if (value.trim() === '') {
+        form.location_assignment_id = null;
+        selectedCompanyLabel.value = '';
+        populateWorkFields(null);
+        companyLookupOpen.value = props.locations.length > 0;
+    }
+});
+
+const selectCompany = (location: LocationOption) => {
+    form.location_assignment_id = location.id;
+    selectedCompanyLabel.value = location.label;
+    companySearch.value = location.label;
+
+    populateWorkFields(location);
+    companyLookupOpen.value = false;
+};
 
 const closeCompanyLookup = () => {
     window.setTimeout(() => {
         companyLookupOpen.value = false;
     }, 100);
-};
-
-const selectedWorkDetail = computed(() =>
-    props.workDetails.find((detail) => detail.client_id === selectedCompanyId),
-);
-
-
-const form = useForm({
-    first_name: props.user.first_name ?? '',
-    last_name: props.user.last_name ?? '',
-    email: props.user.email ?? '',
-    phone: props.user.phone ?? '',
-    mobile: props.user.mobile ?? '',
-    client_id: selectedCompanyId,
-    job_role: props.profile.job_role ?? '',
-    travel_allowance:
-        props.profile.travel_allowance !== null &&
-        props.profile.travel_allowance !== undefined
-            ? String(props.profile.travel_allowance)
-            : '',
-    travel_allowance_currency:
-        props.profile.travel_allowance_currency ?? 'AUD',
-    salary:
-        props.profile.salary !== null && props.profile.salary !== undefined
-            ? String(props.profile.salary)
-            : '',
-    start_shift: selectedWorkDetail.value?.start_shift ?? '',
-    end_shift: selectedWorkDetail.value?.end_shift ?? '',
-});
-
-const filteredCompanies = computed(() => {
-    if (props.companies.length <= 1) {
-        return [];
-    }
-
-    const value = companySearch.value.trim().toLowerCase();
-    const selectedValue = selectedCompanyLabel.value.trim().toLowerCase();
-
-    const searchValue =
-        form.client_id && value === selectedValue ? '' : value;
-
-    return props.companies.filter((company) => {
-        const isCurrentSelection = company.id === form.client_id;
-        const matchesSearch =
-            !searchValue ||
-            company.company_name.toLowerCase().includes(searchValue);
-
-        return matchesSearch && !isCurrentSelection;
-    });
-});
-
-watch(companySearch, (value) => {
-    if (value.trim() === '') {
-        form.client_id = null;
-        selectedCompanyLabel.value = '';
-        companyLookupOpen.value = props.companies.length > 1;
-    }
-});
-
-const selectCompany = (company: Company) => {
-    form.client_id = company.id;
-    const workDetail = props.workDetails.find((detail) => detail.client_id === company.id);
-
-    form.job_role = workDetail?.job_role ?? '';
-    form.salary = workDetail?.salary !== null && workDetail?.salary !== undefined ? String(workDetail.salary) : '';
-    form.travel_allowance =
-        workDetail?.travel_allowance !== null && workDetail?.travel_allowance !== undefined
-            ? String(workDetail.travel_allowance)
-            : '';
-    form.travel_allowance_currency = workDetail?.travel_allowance_currency ?? 'AUD';
-    form.start_shift = workDetail?.start_shift ?? '';
-    form.end_shift = workDetail?.end_shift ?? '';
-    selectedCompanyLabel.value = company.company_name;
-    companySearch.value = company.company_name;
-    companyLookupOpen.value = false;
 };
 
 const toBackendTime = (value: string | null) => {
@@ -287,19 +285,19 @@ function submit() {
 
                             <div class="relative">
                                 <Input id="company" v-model="companySearch" type="search"
-                                    placeholder="Search company..." autocomplete="off"
-                                    @focus="companyLookupOpen = props.companies.length > 1"
-                                    @input="companyLookupOpen = props.companies.length > 1" @blur="closeCompanyLookup"
+                                    placeholder="Search company or site..." autocomplete="off"
+                                    @focus="companyLookupOpen = props.locations.length > 0"
+                                    @input="companyLookupOpen = props.locations.length > 0" @blur="closeCompanyLookup"
                                     @keydown.escape="companyLookupOpen = false" />
 
-                                <InputError :message="form.errors.client_id" />
+                                <InputError :message="form.errors.location_assignment_id" />
 
                                 <div v-if="companyLookupOpen && filteredCompanies.length > 0"
                                     class="absolute z-50 mt-1 max-h-56 w-full overflow-y-auto rounded-md border bg-popover p-1 text-popover-foreground shadow-md">
                                     <button v-for="company in filteredCompanies" :key="company.id" type="button"
                                         class="flex w-full items-center rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent hover:text-accent-foreground"
                                         @mousedown.prevent="selectCompany(company)">
-                                        {{ company.company_name }}
+                                        {{ company.label }}
                                     </button>
                                 </div>
                             </div>
@@ -378,10 +376,10 @@ disabled
                                 <Label for="start_shift">Start shift</Label>
                                 <ShiftTimePicker
                                     id="start_shift"
-v-model="form.start_shift"
+                                    v-model="form.start_shift"
                                     name="start_shift"
                                     placeholder="Select start time"
-disabled
+                                    disabled
                                 />
                                 <InputError :message="form.errors.start_shift" />
                             </div>
@@ -389,8 +387,11 @@ disabled
                             <div class="space-y-2">
                                 <Label for="end_shift">End shift</Label>
                                 <ShiftTimePicker
-id="start_shift" v-model="form.start_shift" name="start_shift"
-                                    placeholder="Select start time" disabled
+                                    id="end_shift"
+                                    v-model="form.end_shift"
+                                    name="end_shift"
+                                    placeholder="Select end time"
+                                    disabled
                                 />
                                 <InputError :message="form.errors.end_shift" />
                             </div>

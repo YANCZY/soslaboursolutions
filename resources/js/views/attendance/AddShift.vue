@@ -24,25 +24,20 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-
-
-type Company = {
-    id: number;
-    company_name: string;
-};
+import type { LocationOption } from '@/types/location';
 
 type AddShiftForm = {
     check_in_date: string;
     check_in_time: string;
     check_out_time: string;
-    client_id: string;
+    location_assignment_id: string;
     covering_for: string;
 };
 
 defineProps<{
     open: boolean;
     form: AddShiftForm;
-    companies: Company[];
+    locations: LocationOption[];
     error?: string;
 }>();
 
@@ -115,8 +110,16 @@ const updateFormField = (form: AddShiftForm, field: keyof AddShiftForm, value: s
                         Company <span class="text-destructive">*</span>
                     </Label>
                     <Select
-                        :model-value="form.client_id"
-                        @update:model-value="updateFormField(form, 'client_id', $event)"
+                        :model-value="form.location_assignment_id"
+                        @update:model-value="(value) => {
+                            if (
+                                value === null ||
+                                typeof value === 'string' ||
+                                typeof value === 'number'
+                            ) {
+                                updateFormField(form, 'location_assignment_id', value ?? '');
+                            }
+                        }"
                     >
                         <SelectTrigger id="add_shift_company">
                             <SelectValue placeholder="Select company" />
@@ -124,11 +127,11 @@ const updateFormField = (form: AddShiftForm, field: keyof AddShiftForm, value: s
 
                         <SelectContent>
                             <SelectItem
-                                v-for="company in companies"
-                                :key="company.id"
-                                :value="String(company.id)"
+                                v-for="location in locations"
+                                :key="location.id"
+                                :value="String(location.id)"
                             >
-                                {{ company.company_name }}
+                                {{ location.label }}
                             </SelectItem>
                         </SelectContent>
                     </Select>

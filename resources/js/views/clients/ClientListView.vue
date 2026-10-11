@@ -20,10 +20,10 @@ const emit = defineEmits<{
 type Client = {
     id: number;
     company_name: string;
-    phone: string;
-    industry: string;
-    website: string;
-    company_address: string;
+    phone: string | null;
+    industry: string | null;
+    website: string | null;
+    company_address: string | null;
 };
 
 type PaginationItem = {

@@ -38,42 +38,27 @@ import {
     TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { exportBrandedPdf } from '@/lib/exportBrandedPdf';
+import type { LocationOption } from '@/types/location';
 import AddShift from '@/views/attendance/AddShift.vue';
 import EditAttendance from '@/views/attendance/EditAttendance.vue';
+import type {
+    Attendance,
+    AttendanceUser,
+} from '@/types/attendance';
 
-type AttendanceWorkDetail = {
-    client_id: number;
-    start_shift: string | null;
-    end_shift: string | null;
-};
 
-type AttendanceUser = {
-    first_name: string;
-    last_name: string;
-    company_work_details?: AttendanceWorkDetail[];
-};
-
-type AttendanceCompany = {
-    id: number;
-    company_name: string;
-};
-
-type Attendance = {
-    id: number;
-    covering_for?: string | null;
-    check_in_date: string;
-    check_in_time: string | null;
-    check_out_time: string | null;
-    lunch_start_time: string | null;
-    lunch_end_time: string | null;
-    total_working_seconds: number | null;
-    approval_status?: 'pending' | 'approved' | 'rejected' | null;
-    user?: AttendanceUser | null;
-    client?: AttendanceCompany | null;
-};
 
 const formatCompanyName = (record: Attendance) => {
-    return record.client?.company_name ?? '-';
+    const companyName = record.client?.company_name ?? '';
+
+    if (!record.site) {
+        return companyName || '-';
+    }
+
+    const siteName =
+        record.site.site_name?.trim() || companyName;
+
+    return `${companyName} - ${siteName}`;
 };
 
 const companyShiftLabel = (record: Attendance) => {
@@ -93,13 +78,10 @@ const assignedWorkDetail = (record: Attendance) => {
     }
 
     return record.user?.company_work_details?.find(
-        (detail) => detail.client_id === record.client?.id,
+        (detail) =>
+            detail.client_id === record.client?.id
+            && detail.site_id === (record.site_id ?? null),
     ) ?? null;
-};
-
-type Company = {
-    id: number;
-    company_name: string;
 };
 
 const addShiftDialogOpen = ref(false);
@@ -108,13 +90,13 @@ const addShiftForm = ref({
     check_in_date: '',
     check_in_time: '',
     check_out_time: '',
-    client_id: '',
+    location_assignment_id: '',
     covering_for: '',
 });
 
 const props = defineProps<{
     attendanceRecords: Attendance[];
-    companies: Company[];
+    locations: LocationOption[];
 }>();
 
 const emit = defineEmits<{
@@ -197,6 +179,32 @@ const groupSelectionState = (
     }
 
     return 'indeterminate';
+};
+
+const toggleGroupSelection = (
+    records: Attendance[],
+    selected: boolean | 'indeterminate',
+) => {
+    const selectableIds = records
+        .filter((record) => isSubmittable(record.approval_status))
+        .map((record) => record.id);
+
+    if (selected === true) {
+        selectedAttendanceIds.value = [
+            ...new Set([
+                ...selectedAttendanceIds.value,
+                ...selectableIds,
+            ]),
+        ];
+
+        return;
+    }
+
+    const groupIds = new Set(selectableIds);
+
+    selectedAttendanceIds.value = selectedAttendanceIds.value.filter(
+        (id) => !groupIds.has(id),
+    );
 };
 
 const selectedGroupRecords = (records: Attendance[]) => {
@@ -585,7 +593,7 @@ const openAddShift = () => {
         check_in_date: '',
         check_in_time: '',
         check_out_time: '',
-        client_id: '',
+        location_assignment_id: '',
         covering_for: '',
     };
 
@@ -973,7 +981,7 @@ class="overflow-x-auto overscroll-x-contain"
                                         :model-value="groupSelectionState(group.records)"
                                         :aria-label="`Select all attendance for week of ${formatWeekRange(group.weekStart)}`"
                                         @update:model-value="
-                                            toggleAttendanceSelection(record, $event)
+                                            toggleGroupSelection(group.records, $event)
                                         "
                                     />
                                 </td>
@@ -1247,7 +1255,7 @@ colspan="11"
                 </div>
 
         </div>
-        <AddShift v-model:open="addShiftDialogOpen" :form="addShiftForm" :companies="props.companies" :error="formError"
+        <AddShift v-model:open="addShiftDialogOpen" :form="addShiftForm" :locations="props.locations" :error="formError"
             @update:form="addShiftForm = $event" @save="saveAddedShift" />
         <EditAttendance
             v-model:open="editDialogOpen"

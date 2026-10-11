@@ -15,6 +15,7 @@ class DatabaseSeeder extends Seeder
             UserTypeSeeder::class,
             ClientSeeder::class,
             SuperadminUserSeeder::class,
+            SiteSeeder::class,
         ]);
 
 
