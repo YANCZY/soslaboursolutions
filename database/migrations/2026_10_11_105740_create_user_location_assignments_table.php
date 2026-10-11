@@ -2,83 +2,111 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
-        Schema::create('user_location_assignments', function (Blueprint $table) {
-            $table->id();
+        $driver = DB::connection()->getDriverName();
 
-            $table->foreignId('user_id')
-                ->constrained()
-                ->cascadeOnDelete();
+        if (! in_array($driver, ['mysql', 'pgsql'], true)) {
+            throw new RuntimeException('Unsupported database driver.');
+        }
 
-            $table->foreignId('client_id')
-                ->constrained('clients')
-                ->restrictOnDelete();
+        if (! Schema::hasTable('user_location_assignments')) {
+            Schema::create('user_location_assignments', function (Blueprint $table) {
+                $table->id();
 
-            $table->foreignId('site_id')
-                ->nullable()
-                ->constrained('sites')
-                ->restrictOnDelete();
+                $table->foreignId('user_id')
+                    ->constrained()
+                    ->cascadeOnDelete();
 
-            $table->timestamps();
-        });
+                $table->foreignId('client_id')
+                    ->constrained('clients')
+                    ->restrictOnDelete();
 
-        // PostgreSQL: prevent duplicate main-company assignments.
-        DB::statement(
-            'CREATE UNIQUE INDEX user_location_main_unique
-            ON user_location_assignments (user_id, client_id)
-            WHERE site_id IS NULL'
-        );
+                $table->foreignId('site_id')
+                    ->nullable()
+                    ->constrained('sites')
+                    ->restrictOnDelete();
 
-        // Prevent duplicate site assignments.
-        DB::statement(
-            'CREATE UNIQUE INDEX user_location_site_unique
-            ON user_location_assignments (user_id, site_id)
-            WHERE site_id IS NOT NULL'
-        );
+                $table->timestamps();
+            });
+        }
 
-        // Existing company assignments become main-company assignments.
-        DB::table('user_location_assignments')->insertUsing(
-            ['user_id', 'client_id', 'created_at', 'updated_at'],
-            DB::table('client_user')->select(
-                'user_id',
-                'client_id',
-                'created_at',
-                'updated_at',
-            ),
-        );
+        if ($driver === 'mysql') {
+            if (! Schema::hasColumn('user_location_assignments', 'main_company_id')) {
+                Schema::table('user_location_assignments', function (Blueprint $table) {
+                    $table->unsignedBigInteger('main_company_id')
+                        ->nullable()
+                        ->storedAs(
+                            'CASE WHEN site_id IS NULL THEN client_id ELSE NULL END'
+                        );
+                });
+            }
 
-        // Include primary company links that are absent from client_user.
-        DB::table('user_location_assignments')->insertUsing(
-            ['user_id', 'client_id', 'created_at', 'updated_at'],
-            DB::table('users')
-                ->whereNotNull('users.client_id')
-                ->whereNotExists(function ($query) {
-                    $query->selectRaw('1')
-                        ->from('user_location_assignments as assignments')
-                        ->whereColumn('assignments.user_id', 'users.id')
-                        ->whereColumn('assignments.client_id', 'users.client_id');
-                })
-                ->select(
-                    'users.id',
-                    'users.client_id',
-                    'users.created_at',
-                    'users.updated_at',
-                ),
-        );
+            if (! Schema::hasIndex('user_location_assignments', 'user_location_main_unique')) {
+                Schema::table('user_location_assignments', function (Blueprint $table) {
+                    $table->unique(
+                        ['user_id', 'main_company_id'],
+                        'user_location_main_unique'
+                    );
+                });
+            }
+
+            if (! Schema::hasIndex('user_location_assignments', 'user_location_site_unique')) {
+                Schema::table('user_location_assignments', function (Blueprint $table) {
+                    $table->unique(
+                        ['user_id', 'site_id'],
+                        'user_location_site_unique'
+                    );
+                });
+            }
+        } else {
+            DB::statement(
+                'CREATE UNIQUE INDEX IF NOT EXISTS user_location_main_unique
+                 ON user_location_assignments (user_id, client_id)
+                 WHERE site_id IS NULL'
+            );
+
+            DB::statement(
+                'CREATE UNIQUE INDEX IF NOT EXISTS user_location_site_unique
+                 ON user_location_assignments (user_id, site_id)
+                 WHERE site_id IS NOT NULL'
+            );
+        }
+
+        // UNION removes duplicate user/company pairs from the two sources.
+        $legacyAssignments = DB::table('client_user')
+            ->select('user_id', 'client_id')
+            ->union(
+                DB::table('users')
+                    ->whereNotNull('client_id')
+                    ->selectRaw('id AS user_id, client_id')
+            )
+            ->get();
+
+        foreach ($legacyAssignments as $assignment) {
+            $exists = DB::table('user_location_assignments')
+                ->where('user_id', $assignment->user_id)
+                ->where('client_id', $assignment->client_id)
+                ->whereNull('site_id')
+                ->exists();
+
+            if (! $exists) {
+                DB::table('user_location_assignments')->insert([
+                    'user_id' => $assignment->user_id,
+                    'client_id' => $assignment->client_id,
+                    'site_id' => null,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            }
+        }
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
         Schema::dropIfExists('user_location_assignments');
