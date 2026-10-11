@@ -13,25 +13,25 @@ use Illuminate\Http\JsonResponse;
 use App\Notifications\TravelAllowanceSubmittedForApprovalNotification;
 use App\Models\User;
 use App\Notifications\TravelAllowanceApprovalStatusNotification;
+use App\Services\UserLocationService;
+
 class TravelAllowanceController extends Controller
 {
     public function index(Request $request): Response
     {
         $user = $request->user();
 
-        $companies = $user
-            ->clients()
-            ->where('clients.is_active', true)
-            ->select('clients.id', 'clients.company_name')
-            ->orderBy('company_name')
-            ->get();
+        $locations = app(UserLocationService::class)->options($user);
 
         $workDetails = $user
             ->companyWorkDetails()
             ->get(['client_id', 'travel_allowance', 'travel_allowance_currency']);
 
         $travelAllowances = TravelAllowance::query()
-            ->with('client:id,company_name')
+            ->with([
+                'client:id,company_name',
+                'site:id,site_name',
+            ])
             ->where('user_id', $user->id)
             ->orderByDesc('date')
             ->orderByDesc('created_at')
@@ -41,28 +41,39 @@ class TravelAllowanceController extends Controller
                 'date' => $allowance->date,
                 'name' => $allowance->name,
                 'client_id' => $allowance->client_id,
-                'company' => $allowance->client?->company_name ?? '-',
+                'company' => UserLocationService::label(
+                    $allowance->client,
+                    $allowance->site,
+                ) ?: '-',
                 'description' => $allowance->description,
                 'rate' => (float) $allowance->rate,
                 'quantity' => (int) $allowance->quantity,
                 'amount' => (float) $allowance->amount,
                 'approval_status' => $allowance->approval_status,
+                'site_id' => $allowance->site_id,
             ])
             ->values();
 
         return Inertia::render('admin/travel-allowance/TravelAllowance', [
             'travelAllowances' => $travelAllowances,
-            'companies' => $companies,
+            'locations' => $locations,
             'workDetails' => $workDetails,
         ]);
     }
+
     public function store(StoreTravelAllowanceRequest $request): RedirectResponse
     {
         $validated = $request->validated();
 
+        $location = app(UserLocationService::class)->resolve(
+            $request->user(),
+            (int) $validated['location_assignment_id'],
+        );
+
         TravelAllowance::query()->create([
             'user_id' => $request->user()->id,
-            'client_id' => $validated['client_id'],
+            'client_id' => $location->client_id,
+            'site_id' => $location->site_id,
             'date' => $validated['date'],
             'name' => $validated['name'],
             'description' => $validated['description'] ?? null,
@@ -192,8 +203,39 @@ class TravelAllowanceController extends Controller
 
         $validated = $request->validated();
 
+        $clientId = $travelAllowance->client_id;
+        $siteId = $travelAllowance->site_id;
+
+        if (! empty($validated['location_assignment_id'])) {
+            $assignment = $request->user()
+                ->locationAssignments()
+                ->find($validated['location_assignment_id']);
+
+            if (! $assignment) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'location_assignment_id' =>
+                        'Select a location assigned to this user.',
+                ]);
+            }
+
+            $sameLocation =
+                (int) $assignment->client_id === (int) $clientId
+                && $assignment->site_id === $siteId;
+
+            if (! $sameLocation) {
+                $location = app(UserLocationService::class)->resolve(
+                    $request->user(),
+                    (int) $validated['location_assignment_id'],
+                );
+
+                $clientId = $location->client_id;
+                $siteId = $location->site_id;
+            }
+        }
+
         $travelAllowance->update([
-            'client_id' => $validated['client_id'],
+            'client_id' => $clientId,
+            'site_id' => $siteId,
             'date' => $validated['date'],
             'name' => $validated['name'],
             'description' => $validated['description'] ?? null,

@@ -17,6 +17,7 @@ class Attendance extends Model
         'covering_for',
         'status',
         'approval_status',
+        'site_id',
         'submitted_for_approval_at',
         'check_in_time',
         'check_out_time',
@@ -32,6 +33,11 @@ class Attendance extends Model
             'submitted_for_approval_at' => 'datetime',
             'total_working_seconds' => 'integer',
         ];
+    }
+
+    public function site(): BelongsTo
+    {
+        return $this->belongsTo(Site::class);
     }
 
     public function user(): BelongsTo

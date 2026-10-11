@@ -14,70 +14,57 @@ import {
     TooltipTrigger,
 } from '@/components/ui/tooltip';
 
+
 // ==========
+import type { LocationOption } from '@/types/location';
 import ForgotCheckoutModal from '@/views/attendance/ForgotCheckoutModal.vue';
+import type { Attendance } from '@/types/attendance';
 
 
 const page = usePage();
 
-type Attendance = {
-    id: number;
-    check_in_date: string;
-    status: 'checked_in' | 'lunch_break' | 'checked_out';
-    check_in_time: string | null;
-    check_out_time: string | null;
-    lunch_start_time: string | null;
-    lunch_end_time: string | null;
-    total_working_seconds: number;
-};
-
-type Company = {
-    id: number;
-    company_name: string;
-    start_shift: string | null;
-    end_shift: string | null;
-};
-
 const props = defineProps<{
     attendance: Attendance | null;
-    companies: Company[];
+    locations: LocationOption[]
 }>();
 
 const emit = defineEmits<{
     'attendance-updated': [];
 }>();
 
-const selectedCompanyStorageKey = 'attendance:selected-company-id';
+const selectedCompanyStorageKey = 'attendance:selected-location-assignment-id';
 const activeAttendance = ref<Attendance | null>(props.attendance);
 
-const selectedCompanyId = ref<number | null>(
-    props.companies.length === 1 ? props.companies[0].id : null,
+const selectedLocationId = ref<number | null>(
+    props.locations.length === 1 ? props.locations[0].id : null,
 );
 
 const companyError = ref('');
 
-const selectedCompany = computed(() =>
-    props.companies.find((company) => company.id === selectedCompanyId.value) ?? null,
+const checkInPending = ref(false);
+
+const selectedLocation = computed(() =>
+    props.locations.find((location) => location.id === selectedLocationId.value) ?? null,
 );
 
-const companySearch = ref(selectedCompany.value?.company_name ?? '');
+const companySearch = ref(selectedLocation.value?.label ?? '');
 const companyLookupOpen = ref(false);
 
 const companySelectionDisabled = computed(() =>
-    props.companies.length <= 1 || checkedIn.value,
+    props.locations.length <= 1 || checkedIn.value || checkInPending.value,
 );
 
 const filteredCompanies = computed(() => {
     const value = companySearch.value.trim().toLowerCase();
 
-    return props.companies.filter((company) =>
-        !value || company.company_name.toLowerCase().includes(value),
+    return props.locations.filter((location) =>
+        !value || location.label.toLowerCase().includes(value),
     );
 });
 
-const selectCompany = (company: Company) => {
-    selectedCompanyId.value = company.id;
-    companySearch.value = company.company_name;
+const selectCompany = (company: LocationOption) => {
+    selectedLocationId.value = company.id;
+    companySearch.value = company.label;
     companyLookupOpen.value = false;
     companyError.value = '';
     localStorage.setItem(selectedCompanyStorageKey, String(company.id));
@@ -250,7 +237,11 @@ const postAttendanceAction = async (url: string, payload: Record<string, unknown
             return;
         }
 
-        toast.error(data?.message ?? 'Attendance request failed.');
+        toast.error(
+            data?.errors?.geolocation?.[0]
+            ?? data?.message
+            ?? 'Attendance request failed.',
+        );
 
         return;
     }
@@ -268,22 +259,83 @@ const postAttendanceAction = async (url: string, payload: Record<string, unknown
     emit('attendance-updated');
 };
 
+const getCurrentPosition = (): Promise<GeolocationPosition> =>
+    new Promise((resolve, reject) => {
+        if (!window.isSecureContext) {
+            reject(new Error(
+                'Location check-in requires HTTPS.',
+            ));
+            return;
+        }
+
+        if (!navigator.geolocation) {
+            reject(new Error(
+                'Your browser does not support location access.',
+            ));
+            return;
+        }
+
+        navigator.geolocation.getCurrentPosition(
+            resolve,
+            (error) => {
+                const messages: Record<number, string> = {
+                    1: 'Allow location access to check in.',
+                    2: 'Your location is unavailable. Enable location services and try again.',
+                    3: 'Getting your location timed out. Please try again.',
+                };
+
+                reject(new Error(
+                    messages[error.code]
+                    ?? 'Unable to get your location.',
+                ));
+            },
+            {
+                enableHighAccuracy: true,
+                maximumAge: 0,
+                timeout: 15000,
+            },
+        );
+    });
+
 const toggleCheckIn = async () => {
+
+    if (checkInPending.value) return;
+
     if (checkedIn.value) {
         await postAttendanceAction('/attendance/check-out');
-
         return;
     }
 
-    if (!selectedCompanyId.value) {
-        companyError.value = 'Please select a company before checking in.';
+    const locationId = selectedLocationId.value;
 
+    if (!locationId) {
+        companyError.value =
+            'Please select a company or site before checking in.';
         return;
     }
 
-    await postAttendanceAction('/attendance/check-in', {
-        client_id: selectedCompanyId.value,
-    });
+    checkInPending.value = true;
+    companyError.value = '';
+
+    try {
+        const position = await getCurrentPosition();
+
+        await postAttendanceAction('/attendance/check-in', {
+            location_assignment_id: locationId,
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+            accuracy: position.coords.accuracy,
+            captured_at: Math.round(position.timestamp),
+        });
+    } catch (error) {
+        toast.error(
+            error instanceof Error
+                ? error.message
+                : 'Unable to verify your location.',
+        );
+    } finally {
+        checkInPending.value = false;
+    }
 };
 
 const toggleLunchBreak = async () => {
@@ -345,16 +397,16 @@ onMounted(() => {
     const storedCompanyId = Number(localStorage.getItem(selectedCompanyStorageKey));
 
     if (
-        props.companies.length > 1 &&
-        props.companies.some((company) => company.id === storedCompanyId)
+        props.locations.length > 1 &&
+        props.locations.some((location) => location.id === storedCompanyId)
     ) {
-        selectedCompanyId.value = storedCompanyId;
+        selectedLocationId.value = storedCompanyId;
         companySearch.value =
-            props.companies.find((company) => company.id === storedCompanyId)?.company_name ?? '';
+            props.locations.find((location) => location.id === storedCompanyId)?.label ?? '';
     }
 
-    if (props.companies.length === 1) {
-        localStorage.setItem(selectedCompanyStorageKey, String(props.companies[0].id));
+    if (props.locations.length === 1) {
+        localStorage.setItem(selectedCompanyStorageKey, String(props.locations[0].id));
     }
 
     currentTimeTimer = window.setInterval(() => {
@@ -376,12 +428,12 @@ onBeforeUnmount(() => {
 class="flex flex-col items-center gap-3 p-4 text-center sm:p-4">
             <div class="w-full max-w-[16rem] text-left">
                 <div class="relative">
-                    <TooltipProvider v-if="selectedCompany" :delay-duration="100">
+                    <TooltipProvider v-if="selectedLocation" :delay-duration="100">
                         <Tooltip>
                             <TooltipTrigger as-child>
                                 <button type="button"
                                     class="absolute inset-y-0 left-2 z-10 flex items-center text-primary hover:text-primary/80"
-                                    :aria-label="`View shift for ${selectedCompany.company_name}`" @mousedown.prevent>
+                                    :aria-label="`View shift for ${selectedLocation.label}`" @mousedown.prevent>
                                     <Info class="size-4" />
                                 </button>
                             </TooltipTrigger>
@@ -389,9 +441,9 @@ class="flex flex-col items-center gap-3 p-4 text-center sm:p-4">
                             <TooltipContent side="top" align="center">
                                 Shift:
                                 {{
-                                    selectedCompany.start_shift && selectedCompany.end_shift
-                                        ? `${formatShiftTime(selectedCompany.start_shift)} -
-                                ${formatShiftTime(selectedCompany.end_shift)}`
+                                    selectedLocation.start_shift && selectedLocation.end_shift
+                                        ? `${formatShiftTime(selectedLocation.start_shift)} -
+                                ${formatShiftTime(selectedLocation.end_shift)}`
                                         : 'No shift assigned'
                                 }}
                             </TooltipContent>
@@ -409,7 +461,7 @@ class="flex flex-col items-center gap-3 p-4 text-center sm:p-4">
                         <button v-for="company in filteredCompanies" :key="company.id" type="button"
                             class="flex w-full items-center rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent hover:text-accent-foreground"
                             @mousedown.prevent="selectCompany(company)">
-                            {{ company.company_name }}
+                            {{ company.label }}
                         </button>
                     </div>
                 </div>
@@ -451,13 +503,20 @@ class="size-24 border-4 border-primary/20 shadow-sm"
                         </p>
                     </div>
 
-
+                    <p
+                        v-if="checkInPending"
+                        role="status"
+                        class="text-center text-sm text-muted-foreground"
+                    >
+                        Checking your location…
+                    </p>
 
                     <div class="flex w-full items-center gap-2">
                         <Button
                             type="button"
 class="h-10 flex-1"
                             :class="checkedIn ? 'bg-red-600 text-white hover:bg-red-700' : ''"
+                            :disabled="checkInPending"
                             @click="toggleCheckIn"
                         >
                             <AlarmClockOff

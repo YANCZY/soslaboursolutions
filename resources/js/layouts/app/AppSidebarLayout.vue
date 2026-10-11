@@ -22,8 +22,6 @@ let notificationPollTimer: number | undefined;
 const refreshNotifications = () => {
     router.reload({
         only: ['auth'],
-        preserveScroll: true,
-        preserveState: true,
     });
 };
 

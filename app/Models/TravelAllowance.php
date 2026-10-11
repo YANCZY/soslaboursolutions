@@ -16,6 +16,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'rate',
     'quantity',
     'amount',
+    'site_id',
     'approval_status',
     'submitted_for_approval_at',
 ])]
@@ -29,6 +30,11 @@ class TravelAllowance extends Model
     public function client(): BelongsTo
     {
         return $this->belongsTo(Client::class);
+    }
+
+    public function site(): BelongsTo
+    {
+        return $this->belongsTo(Site::class);
     }
 
     protected function casts(): array

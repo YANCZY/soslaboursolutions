@@ -14,6 +14,45 @@ class GeoapifyClient
         'populated_place.suburb',
     ];
 
+    public function geocodeAddress(string $address): array
+    {
+        $response = $this->request()
+            ->get('/v1/geocode/search', [
+                'text' => $address,
+                'filter' => 'countrycode:' . strtolower(
+                    (string) config('services.geoapify.country_code', 'au')
+                ),
+                'format' => 'json',
+                'lang' => 'en',
+                'limit' => 1,
+                'apiKey' => config('services.geoapify.api_key'),
+            ])
+            ->throw();
+
+        $result = data_get($response->json(), 'results.0');
+
+        if (
+            ! is_array($result)
+            || ! is_numeric($result['lat'] ?? null)
+            || ! is_numeric($result['lon'] ?? null)
+            || ! in_array(
+                $result['result_type'] ?? '',
+                ['building', 'amenity'],
+                true
+            )
+            || (float) data_get($result, 'rank.confidence', 0) < 0.9
+        ) {
+            throw new RuntimeException(
+                'The workplace address could not be located precisely.'
+            );
+        }
+
+        return [
+            'latitude' => (float) $result['lat'],
+            'longitude' => (float) $result['lon'],
+        ];
+    }
+
     /**
      * @return array{
      *     name: string,

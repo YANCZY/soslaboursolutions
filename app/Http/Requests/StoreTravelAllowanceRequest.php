@@ -27,13 +27,9 @@ class StoreTravelAllowanceRequest extends FormRequest
         return
         [
             'date' => ['required', 'date'],
-            'client_id' => [
-                'required',
+            'location_assignment_id' => [
+                $this->isMethod('POST') ? 'required' : 'nullable',
                 'integer',
-                Rule::exists('client_user', 'client_id')->where(
-                    fn ($query) => $query->where('user_id', $this->user()->id)
-                ),
-                Rule::exists('clients', 'id')->where('is_active', true),
             ],
             'name' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
@@ -47,7 +43,7 @@ class StoreTravelAllowanceRequest extends FormRequest
     {
         return [
             'date.required' => 'Date is required.',
-            'client_id.required' => 'Company is required.',
+            'location_assignment_id.required' => 'Company or site is required.',
             'rate.required' => 'Rate is required.',
             'quantity.required' => 'Quantity is required.',
         ];

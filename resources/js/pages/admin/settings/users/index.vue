@@ -43,6 +43,7 @@ type WorkDetail = {
     travel_allowance_currency?: string | null;
     start_shift?: string | null;
     end_shift?: string | null;
+    site_id: number | null
 };
 
 type User = {
@@ -51,6 +52,10 @@ type User = {
     last_name: string;
     email: string;
     company_work_details: WorkDetail[];
+    user_type: {
+        id: number;
+        user_type_name: string;
+    } | null;
     user_type_id: number;
     status: 'active' | 'inactive' | 'pending';
     phone: string | null;
@@ -58,6 +63,19 @@ type User = {
     clients: {
         id: number;
         company_name: string;
+    }[];
+    location_assignments: {
+    id: number;
+    client_id: number;
+    site_id: number | null;
+    company: {
+        company_name: string;
+        is_active: boolean;
+    };
+    site: {
+        site_name: string | null;
+        is_active: boolean;
+    } | null;
     }[];
 };
 
@@ -82,6 +100,13 @@ type Company = {
     company_name: string;
 };
 
+type AssignmentOption = {
+    key: string;
+    client_id: number;
+    site_id: number | null;
+    label: string;
+};
+
 type UserType = {
     id: number;
     user_type_name: string;
@@ -92,11 +117,35 @@ const props = defineProps<{
     users: PaginatedUsers;
     companies: Company[];
     userTypes: UserType[];
+    assignment_options: AssignmentOption[];
     filters: {
         search: string;
         status: 'active' | 'inactive' | 'pending' | 'all';
     };
 }>();
+
+const userLocationLabels = (user: User) =>
+    user.location_assignments.map((assignment) => {
+        const companyName = assignment.company.company_name;
+        const siteName =
+            assignment.site?.site_name?.trim() || companyName;
+
+        const label = assignment.site_id === null
+            ? companyName
+            : `${companyName} - ${siteName}`;
+
+        const isInactive =
+            !assignment.company.is_active ||
+            (
+                assignment.site_id !== null &&
+                !assignment.site?.is_active
+            );
+
+        return {
+            id: assignment.id,
+            label: isInactive ? `${label} (Inactive)` : label,
+        };
+    });
 
 const search = ref(props.filters.search ?? '');
 
@@ -136,7 +185,7 @@ const changeStatusFilter = (status: StatusFilter) => {
 const companySearch = ref('');
 const companyLookupOpen = ref(false);
 const companyVisibleLimit = ref(5);
-const selectedCompanyIds = ref<number[]>([]);
+const selectedAssignments = ref<AssignmentOption[]>([]);
 
 const profileSearch = ref('');
 const profileLookupOpen = ref(false);
@@ -162,19 +211,25 @@ const addUserForm = useForm({
     phone: '',
     client_ids: [] as number[],
     user_type_id: null as number | null,
+    assignments: [] as {
+        client_id: number;
+        site_id: number | null;
+    }[],
 });
 
 
 const filteredCompanies = computed(() => {
     const value = companySearch.value.trim().toLowerCase();
 
-    return props.companies.filter((company) => {
+    return props.assignment_options.filter((option) => {
         const matchesSearch =
-            !value || company.company_name.toLowerCase().includes(value);
+            !value || option.label.toLowerCase().includes(value);
 
-        const isAlreadySelected = selectedCompanyIds.value.includes(company.id);
+        const isSelected = selectedAssignments.value.some(
+            (selected) => selected.key === option.key,
+        );
 
-        return matchesSearch && !isAlreadySelected;
+        return matchesSearch && !isSelected;
     });
 });
 
@@ -198,32 +253,36 @@ const filteredUserTypes = computed(() => {
     );
 });
 
-const selectCompany = (company: Company) => {
-    if (selectedCompanyIds.value.includes(company.id)) {
+const selectCompany = (option: AssignmentOption) => {
+    if (
+        selectedAssignments.value.some(
+            (selected) => selected.key === option.key,
+        )
+    ) {
         return;
     }
 
-    if (selectedCompanyIds.value.length >= 3) {
-        toast.error('You can select up to 3 companies only.');
+    const companyIds = new Set(
+        selectedAssignments.value.map((selected) => selected.client_id),
+    );
+
+    if (!companyIds.has(option.client_id) && companyIds.size >= 3) {
+        toast.error('You can assign up to 3 companies.');
 
         return;
     }
 
-    selectedCompanyIds.value.push(company.id);
+    selectedAssignments.value.push(option);
     companySearch.value = '';
     companyLookupOpen.value = true;
     companyVisibleLimit.value = 5;
 };
 
-const selectedCompanies = computed(() =>
-    props.companies.filter((company) =>
-        selectedCompanyIds.value.includes(company.id),
-    ),
-);
+const selectedCompanies = computed(() => selectedAssignments.value);
 
-const removeCompany = (companyId: number) => {
-    selectedCompanyIds.value = selectedCompanyIds.value.filter(
-        (id) => id !== companyId,
+const removeCompany = (key: string) => {
+    selectedAssignments.value = selectedAssignments.value.filter(
+        (selected) => selected.key !== key,
     );
 };
 
@@ -259,7 +318,16 @@ const closeCompanyLookup = () => {
 };
 
 const saveUser = () => {
-    addUserForm.client_ids = selectedCompanyIds.value;
+   addUserForm.client_ids = [
+        ...new Set(
+            selectedAssignments.value.map((option) => option.client_id),
+        ),
+    ];
+
+    addUserForm.assignments = selectedAssignments.value.map((option) => ({
+        client_id: option.client_id,
+        site_id: option.site_id,
+    }));
     addUserForm.user_type_id = selectedUserTypeId.value;
 
     addUserForm.post('/settings/users', {
@@ -268,7 +336,7 @@ const saveUser = () => {
             addUserDialogOpen.value = false;
             addUserForm.reset();
             companySearch.value = '';
-            selectedCompanyIds.value = [];
+            selectedAssignments.value = [];
             profileSearch.value = '';
             selectedUserTypeId.value = null;
             toast.success('User has been added. Account setup email will be sent shortly.');
@@ -496,23 +564,24 @@ class="h-8 gap-2 text-white hover:bg-red-700">
                             </div>
 
                             <div class="grid gap-2 sm:col-span-2">
-                                <Label for="company">Company</Label>
+                                <Label for="company">Company / Site</Label>
 
                                 <div class="relative">
                                     <Input id="company" v-model="companySearch" type="search"
-                                        placeholder="Search company..." autocomplete="off"
+                                        placeholder="Search company or site..." autocomplete="off"
                                         @focus="companyLookupOpen = true" @input="companyLookupOpen = true"
                                         @blur="closeCompanyLookup"
                                         @keydown.escape="companyLookupOpen = false" />
                                     <InputError :message="addUserForm.errors.client_ids" />
+                                    <InputError :message="addUserForm.errors.assignments" />
                                     <div v-if="selectedCompanies.length > 0" class="mt-2 flex flex-wrap gap-2">
-                                        <span v-for="company in selectedCompanies" :key="company.id"
+                                        <span v-for="company in selectedCompanies" :key="company.key"
                                             class="inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium">
-                                            {{ company.company_name }}
+                                            {{ company.label }}
 
                                             <button type="button" class="text-muted-foreground hover:text-foreground"
-                                                :aria-label="`Remove ${company.company_name}`" @mousedown.prevent
-                                                @click="removeCompany(company.id)">
+                                                :aria-label="`Remove ${company.label}`" @mousedown.prevent
+                                                @click="removeCompany(company.key)">
                                                 ×
                                             </button>
                                         </span>
@@ -521,10 +590,14 @@ class="h-8 gap-2 text-white hover:bg-red-700">
                                     <div v-if="companyLookupOpen"
                                         class="absolute z-50 mt-1 max-h-56 w-full overflow-y-auto rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
                                         @scroll="loadMoreCompanies">
-                                        <button v-for="company in visibleCompanies" :key="company.id" type="button"
+                                        <button
+                                            v-for="company in visibleCompanies"
+                                            :key="company.key"
+                                            type="button"
                                             class="flex w-full items-center rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent hover:text-accent-foreground"
-                                            @mousedown.prevent="selectCompany(company)">
-                                            {{ company.company_name }}
+                                            @mousedown.prevent="selectCompany(company)"
+                                        >
+                                            {{ company.label }}
                                         </button>
 
                                         <div v-if="hasMoreCompanies" class="px-2 py-2 text-xs text-muted-foreground">
@@ -533,7 +606,7 @@ class="h-8 gap-2 text-white hover:bg-red-700">
 
                                         <div v-if="filteredCompanies.length === 0"
                                             class="px-2 py-2 text-sm text-muted-foreground">
-                                            No companies found.
+                                            No companies or sites found.
                                         </div>
                                     </div>
                                 </div>
@@ -854,6 +927,7 @@ class="h-8 gap-2 text-white hover:bg-red-700">
             :user="selectedUser"
             :companies="companies"
             :user-types="userTypes"
+            :assignment-options="props.assignment_options"
             @saved="selectedUser = null"
         />
         <Dialog v-model:open="statusConfirmationOpen" @update:open="(open) => !open && cancelStatusConfirmation()">

@@ -1,26 +1,25 @@
 <script setup lang="ts">
 import { Head, router } from '@inertiajs/vue3';
 import { Card } from '@/components/ui/card';
+import type { LocationOption } from '@/types/location';
 import AttendanceTable from '@/views/attendance/AttendanceTable.vue';
 import CheckInCard from '@/views/attendance/CheckInCard.vue';
 import TotalWorkingHoursCard from '@/views/attendance/TotalWorkingHoursCard.vue';
 
-type Company = {
-    id: number;
-    company_name: string;
-};
+import type {
+    Attendance,
+} from '@/types/attendance';
 
 const props = defineProps<{
-    todayAttendance: Record<string, unknown> | null;
-    weeklyAttendance: Record<string, unknown>[];
-    attendanceRecords: Record<string, unknown>[];
-    companies: Company[];
+    todayAttendance: Attendance | null;
+    weeklyAttendance: Attendance[];
+    attendanceRecords: Attendance[];
+    locations: LocationOption[]
 }>();
 
 const refreshAttendance = () => {
     router.reload({
-        only: ['todayAttendance', 'weeklyAttendance', 'attendanceRecords', 'companies'],
-        preserveScroll: true,
+        only: ['todayAttendance', 'weeklyAttendance', 'attendanceRecords', 'locations'],
     });
 };
 
@@ -40,7 +39,7 @@ defineOptions({
         <div class="grid gap-4 xl:grid-cols-[minmax(0,24rem)_1fr]">
             <CheckInCard
                 :attendance="props.todayAttendance"
-                :companies="props.companies"
+                :locations="props.locations"
                 @attendance-updated="refreshAttendance"
             />
             <TotalWorkingHoursCard :weekly-attendance="weeklyAttendance" @attendance-updated="refreshAttendance" />
@@ -49,7 +48,7 @@ defineOptions({
         <Card>
             <AttendanceTable
                 :attendance-records="props.attendanceRecords"
-                :companies="props.companies"
+                :locations="props.locations"
                 @attendance-updated="refreshAttendance"
             />
         </Card>

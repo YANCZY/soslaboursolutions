@@ -24,11 +24,37 @@ type WorkDetail = {
     travel_allowance_currency?: string | null;
     start_shift?: string | null;
     end_shift?: string | null;
+    site_id: number | null
 };
 
 type Company = {
     id: number;
     company_name: string;
+};
+
+type AssignmentOption = {
+    key: string;
+    client_id: number;
+    site_id: number | null;
+    label: string;
+};
+
+type SavedAssignment = {
+    id: number;
+    client_id: number;
+    site_id: number | null;
+    company: {
+        company_name: string;
+        is_active: boolean;
+    };
+    site: {
+        site_name: string | null;
+        is_active: boolean;
+    } | null;
+};
+
+type SelectedAssignment = AssignmentOption & {
+    is_available: boolean;
 };
 
 type UserType = {
@@ -46,6 +72,8 @@ type User = {
     phone: string | null;
     mobile: string | null;
     clients: Company[];
+    location_assignments: SavedAssignment[];
+    user_type: UserType | null;
 };
 
 const props = defineProps<{
@@ -53,6 +81,7 @@ const props = defineProps<{
     user: User;
     companies: Company[];
     userTypes: UserType[];
+    assignmentOptions: AssignmentOption[];
 }>();
 
 const emit = defineEmits<{
@@ -68,8 +97,13 @@ const form = useForm({
     mobile: '',
     user_type_id: null as number | null,
     client_ids: [] as number[],
+    assignments: [] as {
+        client_id: number;
+        site_id: number | null;
+    }[],
     work_detail: {
         client_id: null as number | null,
+        site_id: null as number | null,
         salary: '',
         travel_allowance: '',
         travel_allowance_currency: 'AUD',
@@ -82,38 +116,86 @@ const form = useForm({
 const companySearch = ref('');
 const companyLookupOpen = ref(false);
 const companyVisibleLimit = ref(5);
+const selectedAssignments = ref<SelectedAssignment[]>([]);
+const selectedWorkLocationKey = ref('');
+const saveWorkDetails = ref(false);
+
+
+const workLocations = computed(() =>
+    selectedAssignments.value.filter(
+        (assignment) => assignment.is_available,
+    ),
+);
+
+const refreshClientIds = () => {
+    form.client_ids = [
+        ...new Set(
+            selectedAssignments.value.map(
+                (assignment) => assignment.client_id,
+            ),
+        ),
+    ];
+};
 
 const selectedCompanies = computed(() =>
     props.companies.filter((company) => form.client_ids.includes(company.id)),
 );
 
-const fillWorkDetail = (companyId: number | null) => {
+const fillWorkDetail = (
+    companyId: number | null,
+    siteId: number | null,
+) => {
     const detail = props.user.company_work_details.find(
-        (workDetail) => workDetail.client_id === companyId,
+        (workDetail) =>
+            workDetail.client_id === companyId
+            && workDetail.site_id === siteId,
     );
 
     form.work_detail.client_id = companyId;
-    form.work_detail.salary = detail?.salary !== null && detail?.salary !== undefined ? String(detail.salary) : '';
+    form.work_detail.site_id = siteId;
+
+    form.work_detail.salary = detail?.salary == null
+        ? ''
+        : String(detail.salary);
+
     form.work_detail.travel_allowance =
-        detail?.travel_allowance !== null && detail?.travel_allowance !== undefined
-            ? String(detail.travel_allowance)
-            : '';
-    form.work_detail.travel_allowance_currency = detail?.travel_allowance_currency ?? 'AUD';
+        detail?.travel_allowance == null
+            ? ''
+            : String(detail.travel_allowance);
+
+    form.work_detail.travel_allowance_currency =
+        detail?.travel_allowance_currency ?? '';
+
     form.work_detail.job_role = detail?.job_role ?? '';
     form.work_detail.start_shift = detail?.start_shift ?? '';
     form.work_detail.end_shift = detail?.end_shift ?? '';
 };
 
+const selectWorkLocation = (key: string) => {
+    selectedWorkLocationKey.value = key;
+
+    const location = workLocations.value.find(
+        (assignment) => assignment.key === key,
+    );
+
+   fillWorkDetail(
+        location?.client_id ?? null,
+        location?.site_id ?? null,
+    );
+};
+
 const filteredCompanies = computed(() => {
     const value = companySearch.value.trim().toLowerCase();
 
-    return props.companies.filter((company) => {
+    return props.assignmentOptions.filter((option) => {
         const matchesSearch =
-            !value || company.company_name.toLowerCase().includes(value);
+            !value || option.label.toLowerCase().includes(value);
 
-        const isAlreadySelected = form.client_ids.includes(company.id);
+        const isSelected = selectedAssignments.value.some(
+            (selected) => selected.key === option.key,
+        );
 
-        return matchesSearch && !isAlreadySelected;
+        return matchesSearch && !isSelected;
     });
 });
 
@@ -125,14 +207,56 @@ const hasMoreCompanies = computed(
     () => companyVisibleLimit.value < filteredCompanies.value.length,
 );
 
+const editUserTypes = computed(() => {
+    const currentType = props.user.user_type;
+
+    if (
+        currentType &&
+        !props.userTypes.some(
+            (userType) => userType.id === currentType.id,
+        )
+    ) {
+        return [currentType, ...props.userTypes];
+    }
+
+    return props.userTypes;
+});
+
 const resetForm = () => {
     form.first_name = props.user.first_name ?? '';
     form.last_name = props.user.last_name ?? '';
     form.email = props.user.email ?? '';
     form.phone = props.user.phone ?? '';
     form.mobile = props.user.mobile ?? '';
-    form.user_type_id = props.user.user_type_id;
-    form.client_ids = props.user.clients.map((client) => client.id);
+    form.user_type_id =
+    props.user.user_type?.id ?? props.user.user_type_id ?? null;
+    selectedAssignments.value = props.user.location_assignments.map(
+        (assignment) => {
+            const companyName = assignment.company.company_name;
+            const siteName =
+                assignment.site?.site_name?.trim() || companyName;
+
+            return {
+                key: assignment.site_id === null
+                    ? `company:${assignment.client_id}`
+                    : `site:${assignment.site_id}`,
+                client_id: assignment.client_id,
+                site_id: assignment.site_id,
+                label: assignment.site_id === null
+                    ? companyName
+                    : `${companyName} - ${siteName}`,
+                is_available:
+                    assignment.company.is_active &&
+                    (
+                        assignment.site_id === null ||
+                        assignment.site?.is_active === true
+                    ),
+            };
+        },
+    );
+
+    refreshClientIds();
+    saveWorkDetails.value = false;
     companySearch.value = '';
     companyLookupOpen.value = false;
     companyVisibleLimit.value = 5;
@@ -144,39 +268,62 @@ watch(
     (open) => {
         if (open) {
             resetForm();
-            fillWorkDetail(form.client_ids[0] ?? null);
+            selectWorkLocation(workLocations.value[0]?.key ?? '');
         }
     },
     { immediate: true },
 );
 
-const selectCompany = (company: Company) => {
-    if (form.client_ids.includes(company.id)) {
+const selectCompany = (option: AssignmentOption) => {
+    if (
+        selectedAssignments.value.some(
+            (selected) => selected.key === option.key,
+        )
+    ) {
         return;
     }
 
-    if (!form.work_detail.client_id) {
-        fillWorkDetail(company.id);
-    }
+    const companyIds = new Set(form.client_ids);
 
-    if (form.client_ids.length >= 3) {
-        form.setError('client_ids', 'You can select up to 3 companies only.');
+    if (!companyIds.has(option.client_id) && companyIds.size >= 3) {
+        form.setError('assignments', 'You can assign up to 3 companies.');
 
         return;
     }
 
-    form.clearErrors('client_ids');
-    form.client_ids = [...form.client_ids, company.id];
+    selectedAssignments.value.push({
+        ...option,
+        is_available: true,
+    });
+
+    refreshClientIds();
+    form.clearErrors('assignments');
+
+    if (!selectedWorkLocationKey.value) {
+        selectWorkLocation(option.key);
+    }
+
     companySearch.value = '';
     companyLookupOpen.value = true;
     companyVisibleLimit.value = 5;
 };
 
-const removeCompany = (companyId: number) => {
-    form.client_ids = form.client_ids.filter((id) => id !== companyId);
+const removeCompany = (key: string) => {
+    const assignment = selectedAssignments.value.find(
+        (selected) => selected.key === key,
+    );
 
-    if (form.work_detail.client_id === companyId) {
-        fillWorkDetail(form.client_ids[0] ?? null);
+    if (!assignment || !assignment.is_available) return;
+
+    selectedAssignments.value = selectedAssignments.value.filter(
+        (selected) => selected.key !== key,
+    );
+
+    refreshClientIds();
+
+    if (!workLocations.value.some((location) => location.key === selectedWorkLocationKey.value,)) {
+        selectWorkLocation(workLocations.value[0]?.key ?? '');
+        saveWorkDetails.value = false;
     }
 };
 
@@ -236,14 +383,29 @@ const toBackendTime = (value: string | null) => {
 };
 
 const submit = () => {
+    refreshClientIds();
+
+    form.assignments = selectedAssignments.value.map(
+        (assignment) => ({
+            client_id: assignment.client_id,
+            site_id: assignment.site_id,
+        }),
+    );
+
     form
         .transform((data) => ({
             ...data,
-            work_detail: {
-                ...data.work_detail,
-                start_shift: toBackendTime(data.work_detail.start_shift),
-                end_shift: toBackendTime(data.work_detail.end_shift),
-            },
+            work_detail: saveWorkDetails.value
+                ? {
+                    ...data.work_detail,
+                    start_shift: toBackendTime(
+                        data.work_detail.start_shift,
+                    ),
+                    end_shift: toBackendTime(
+                        data.work_detail.end_shift,
+                    ),
+                }
+                : null,
         }))
         .patch(`/settings/users/${props.user.id}`, {
             preserveScroll: true,
@@ -308,8 +470,12 @@ const submit = () => {
                         v-model="form.user_type_id"
                         class="h-10 rounded-md border border-input bg-background px-3 text-sm"
                     >
-                        <option :value="null" disabled>Select profile</option>
-                        <option v-for="userType in userTypes" :key="userType.id" :value="userType.id">
+                        <option :value="null" disabled></option>
+                        <option
+                            v-for="userType in editUserTypes"
+                            :key="userType.id"
+                            :value="userType.id"
+                        >
                             {{ userType.user_type_name }}
                         </option>
                     </select>
@@ -317,14 +483,14 @@ const submit = () => {
                 </div>
 
                 <div class="grid gap-2">
-                    <Label for="edit_company">Companies</Label>
+                    <Label for="edit_company">Companies / Sites</Label>
 
                     <div class="relative">
                         <Input
                             id="edit_company"
                             v-model="companySearch"
                             type="search"
-                            placeholder="Search company..."
+                            placeholder="Search company or site..."
                             autocomplete="off"
                             @focus="companyLookupOpen = true"
                             @input="companyLookupOpen = true"
@@ -332,20 +498,31 @@ const submit = () => {
                             @keydown.escape="companyLookupOpen = false"
                         />
 
-                        <div v-if="selectedCompanies.length > 0" class="mt-2 flex flex-wrap gap-2">
+                        <div
+                            v-if="selectedAssignments.length > 0"
+                            class="mt-2 flex flex-wrap gap-2"
+                        >
                             <span
-                                v-for="company in selectedCompanies"
-                                :key="company.id"
+                                v-for="assignment in selectedAssignments"
+                                :key="assignment.key"
                                 class="inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium"
                             >
-                                {{ company.company_name }}
+                                {{ assignment.label }}
+
+                                <span
+                                    v-if="!assignment.is_available"
+                                    class="text-muted-foreground"
+                                >
+                                    (Inactive)
+                                </span>
 
                                 <button
+                                    v-else
                                     type="button"
                                     class="text-muted-foreground hover:text-foreground"
-                                    :aria-label="`Remove ${company.company_name}`"
+                                    :aria-label="`Remove ${assignment.label}`"
                                     @mousedown.prevent
-                                    @click="removeCompany(company.id)"
+                                    @click="removeCompany(assignment.key)"
                                 >
                                     x
                                 </button>
@@ -358,52 +535,78 @@ const submit = () => {
                             @scroll="loadMoreCompanies"
                         >
                             <button
-                                v-for="company in visibleCompanies"
-                                :key="company.id"
+                                v-for="option in visibleCompanies"
+                                :key="option.key"
                                 type="button"
                                 class="flex w-full items-center rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent hover:text-accent-foreground"
-                                @mousedown.prevent="selectCompany(company)"
+                                @mousedown.prevent="selectCompany(option)"
                             >
-                                {{ company.company_name }}
+                                {{ option.label }}
                             </button>
 
-                            <div v-if="hasMoreCompanies" class="px-2 py-2 text-xs text-muted-foreground">
-                                Type to search more company...
+                            <div
+                                v-if="hasMoreCompanies"
+                                class="px-2 py-2 text-xs text-muted-foreground"
+                            >
+                                Type to search more companies or sites...
                             </div>
 
-                            <div v-if="filteredCompanies.length === 0" class="px-2 py-2 text-sm text-muted-foreground">
-                                No companies found.
+                            <div
+                                v-if="filteredCompanies.length === 0"
+                                class="px-2 py-2 text-sm text-muted-foreground"
+                            >
+                                No matching companies or sites found.
                             </div>
                         </div>
                     </div>
 
                     <p class="text-xs text-muted-foreground">
-                        Selected: {{ selectedCompanies.length }} of 3
+                        {{ selectedAssignments.length }} locations across
+                        {{ form.client_ids.length }} of 3 companies.
                     </p>
 
+                    <InputError :message="form.errors.assignments" />
                     <InputError :message="form.errors.client_ids" />
                 </div>
 
                 <section v-if="selectedCompanies.length > 0" class="space-y-4 border-t pt-4">
                     <div class="flex items-center gap-4">
                         <h3 class="shrink-0 text-base font-semibold">Work details</h3>
+                        <label class="flex items-center gap-2 text-sm">
+                            <input
+                                v-model="saveWorkDetails"
+                                type="checkbox"
+                                class="size-4 accent-primary"
+                            />
+                            Update work details with this save
+                        </label>
                         <div class="h-px flex-1 bg-border"></div>
                     </div>
 
                     <div class="grid gap-4 sm:grid-cols-2">
                         <div class="grid gap-2 sm:col-span-2">
-                            <Label for="edit_work_company">Company</Label>
+                            <Label for="edit_work_company">Company / Site</Label>
                             <select
                                 id="edit_work_company"
-                                v-model="form.work_detail.client_id"
+                                v-model="selectedWorkLocationKey"
                                 class="h-10 rounded-md border border-input bg-background px-3 text-sm"
-                                @change="fillWorkDetail(Number(form.work_detail.client_id))"
+                                @change="selectWorkLocation(selectedWorkLocationKey)"
                             >
-                                <option :value="null" disabled>Select company</option>
-                                <option v-for="company in selectedCompanies" :key="company.id" :value="company.id">
-                                    {{ company.company_name }}
+                                <option value="" disabled>Select company or site</option>
+
+                                <option
+                                    v-for="location in workLocations"
+                                    :key="location.key"
+                                    :value="location.key"
+                                >
+                                    {{ location.label }}
                                 </option>
                             </select>
+
+                            <p class="text-sm text-muted-foreground">
+                                Work details apply only to the selected company or site.
+                            </p>
+
                             <InputError :message="form.errors['work_detail.client_id']" />
                         </div>
 
@@ -421,8 +624,13 @@ const submit = () => {
 
                         <div class="grid gap-2">
                             <Label for="edit_travel_currency">Travel Currency</Label>
-                            <Input id="edit_travel_currency" v-model="form.work_detail.travel_allowance_currency" disabled />
-                            <InputError :message="form.errors['work_detail.travel_allowance_currency']" />
+                            <Input
+                                id="edit_travel_currency"
+                                v-model="form.work_detail.travel_allowance_currency"
+                                maxlength="3"
+                                placeholder="AUD"
+                            />
+                     <InputError :message="form.errors['work_detail.travel_allowance_currency']" />
                         </div>
 
                         <div class="grid gap-2">

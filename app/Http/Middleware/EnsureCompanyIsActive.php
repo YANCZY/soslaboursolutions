@@ -138,6 +138,6 @@ class EnsureCompanyIsActive
             ]);
         }
 
-        $add($companyId);
+        $add($companyId, 'client_id', false);
     }
 }

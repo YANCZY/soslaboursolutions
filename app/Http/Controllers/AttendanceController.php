@@ -12,6 +12,8 @@ use Illuminate\Validation\Rule;
 use App\Models\User;
 use App\Notifications\TimesheetSubmittedForApprovalNotification;
 use App\Notifications\AttendanceApprovalStatusNotification;
+use App\Services\UserLocationService;
+use App\Services\AttendanceGeofence;
 
 class AttendanceController extends Controller
 {
@@ -22,25 +24,9 @@ class AttendanceController extends Controller
     {
         $user = $request->user();
 
-        $user->load('companyWorkDetails:id,user_id,client_id,start_shift,end_shift');
+        $user->load('companyWorkDetails:id,user_id,client_id,site_id,start_shift,end_shift');
 
-        $companies = $user
-        ->clients()
-            ->where('clients.is_active', true)
-        ->select('clients.id', 'clients.company_name')
-        ->orderBy('company_name')
-        ->get()
-        ->map(function ($company) use ($user) {
-            $workDetail = $user->companyWorkDetails
-                ->firstWhere('client_id', $company->id);
-
-            return [
-                'id' => $company->id,
-                'company_name' => $company->company_name,
-                'start_shift' => $workDetail?->start_shift,
-                'end_shift' => $workDetail?->end_shift,
-            ];
-        });
+        $locations = app(UserLocationService::class)->options($user);
 
         $todayAttendance = $this->latestOpenAttendance($request);
 
@@ -51,7 +37,8 @@ class AttendanceController extends Controller
             ->with([
                 'user:id,first_name,last_name',
             'client:id,company_name',
-            'user.companyWorkDetails:id,user_id,client_id,start_shift,end_shift',
+            'user.companyWorkDetails:id,user_id,client_id,site_id,start_shift,end_shift',
+            'site:id,site_name',
             ])
             ->where('employee_id', $user->id)
             ->whereBetween('check_in_date', [$weekStart, $weekEnd])
@@ -63,7 +50,8 @@ class AttendanceController extends Controller
             ->with([
                 'user:id,first_name,last_name',
                 'client:id,company_name',
-                'user.companyWorkDetails:id,user_id,client_id,start_shift,end_shift',
+                'user.companyWorkDetails:id,user_id,client_id,site_id,start_shift,end_shift',
+                'site:id,site_name',
             ])
             ->where('employee_id', $user->id)
             ->orderByDesc('check_in_date')
@@ -74,14 +62,13 @@ class AttendanceController extends Controller
             'todayAttendance' => $todayAttendance,
             'weeklyAttendance' => $weeklyAttendance,
             'attendanceRecords' => $attendanceRecords,
-            'companies' => $companies,
+            'locations' => $locations,
         ]);
 
     }
 
     public function checkIn(Request $request): JsonResponse
     {
-        $now = now($this->userTimezone($request));
 
         $activeAttendance = $this->latestOpenAttendance($request);
 
@@ -93,23 +80,36 @@ class AttendanceController extends Controller
         }
 
         $validated = $request->validate([
-            'client_id' => [
-                'required',
-                'integer',
-                Rule::exists('client_user', 'client_id')->where(
-                    fn($query) => $query->where('user_id', $request->user()->id)
-                ),
-                Rule::exists('clients', 'id')->where('is_active', true),
-            ],
+            'location_assignment_id' => ['required', 'integer'],
+            'latitude' => ['required', 'numeric', 'between:-90,90'],
+            'longitude' => ['required', 'numeric', 'between:-180,180'],
+            'accuracy' => ['required', 'numeric', 'min:0', 'max:100000'],
+            'captured_at' => ['required', 'integer', 'min:1'],
         ]);
 
+        $location = app(UserLocationService::class)->resolve(
+            $request->user(),
+            (int) $validated['location_assignment_id'],
+        );
+
+        app(AttendanceGeofence::class)->assertWithin(
+            $location,
+            $validated,
+        );
+
+        $now = now($this->userTimezone($request));
+
+        
         $attendance = Attendance::query()->create([
             'employee_id' => $request->user()->id,
             'check_in_date' => $now->toDateString(),
             'status' => 'checked_in',
             'check_in_time' => $now->format('H:i:s'),
-            'client_id' => $validated['client_id'],
+            'client_id' => $location->client_id,
+            'site_id' => $location->site_id,
         ]);
+
+
 
         return response()->json([
             'message' => 'Checked in successfully.',
@@ -489,7 +489,10 @@ class AttendanceController extends Controller
     private function latestOpenAttendance(Request $request): ?Attendance
     {
         return Attendance::query()
-            ->with('client:id,company_name')
+            ->with([
+                'client:id,company_name',
+                'site:id,site_name',
+            ])
             ->where('employee_id', $request->user()->id)
             ->whereNotNull('check_in_time')
             ->whereNull('check_out_time')
@@ -564,16 +567,14 @@ class AttendanceController extends Controller
             'check_in_date' => ['required', 'date'],
             'check_in_time' => ['required', 'date_format:H:i'],
             'check_out_time' => ['required', 'date_format:H:i'],
-            'client_id' => [
-                'required',
-                'integer',
-                Rule::exists('client_user', 'client_id')->where(
-                    fn ($query) => $query->where('user_id', $request->user()->id)
-                ),
-                Rule::exists('clients', 'id')->where('is_active', true),
-            ],
+            'location_assignment_id' => ['required', 'integer'],
             'covering_for' => ['nullable', 'string', 'max:255'],
         ]);
+
+        $location = app(UserLocationService::class)->resolve(
+            $request->user(),
+            (int) $validated['location_assignment_id'],
+        );
 
         $checkIn = Carbon::parse($validated['check_in_date'].' '.$validated['check_in_time']);
         $checkOut = Carbon::parse($validated['check_in_date'].' '.$validated['check_out_time']);
@@ -584,7 +585,8 @@ class AttendanceController extends Controller
 
         $attendance = Attendance::query()->create([
             'employee_id' => $request->user()->id,
-            'client_id' => $validated['client_id'],
+            'client_id' => $location->client_id,
+            'site_id' => $location->site_id,
             'covering_for' => $validated['covering_for'] ?? null,
             'check_in_date' => $validated['check_in_date'],
             'check_in_time' => $validated['check_in_time'],

@@ -34,6 +34,7 @@ type TravelAllowance = {
     date: string;
     name: string;
     client_id: number;
+    site_id: number | null;
     company: string;
     description: string;
     rate: number;

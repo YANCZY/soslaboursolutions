@@ -37,6 +37,7 @@ class Client extends Model
         'attendances',
         'travelAllowances',
         'saveRequests',
+        'sites',
     ];
 
     protected function casts(): array
@@ -49,6 +50,11 @@ class Client extends Model
     public function scopeActive(Builder $query): Builder
     {
         return $query->where('clients.is_active', true);
+    }
+
+    public function sites(): HasMany
+    {
+        return $this->hasMany(Site::class, 'client_id');
     }
 
     public function workDetails(): HasMany

@@ -290,7 +290,6 @@ const exportForApprovalsAsPdf = (range: { startDate: string; endDate: string }) 
 const refreshApprovalRecords = (successMessage: string) => {
     router.reload({
         only: ['attendanceApprovalRecords', 'travelAllowanceApprovalRecords'],
-        preserveScroll: true,
         onSuccess: () => {
             toast.success(successMessage);
         },
