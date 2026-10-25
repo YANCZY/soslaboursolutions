@@ -313,7 +313,9 @@ const removeCompany = (key: string) => {
         (selected) => selected.key === key,
     );
 
-    if (!assignment || !assignment.is_available) return;
+    if (!assignment || !assignment.is_available) {
+return;
+}
 
     selectedAssignments.value = selectedAssignments.value.filter(
         (selected) => selected.key !== key,

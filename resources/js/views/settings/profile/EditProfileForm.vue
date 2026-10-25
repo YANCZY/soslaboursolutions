@@ -108,7 +108,9 @@ const populateForm = () => {
 watch(
     () => props.open,
     (isOpen) => {
-        if (isOpen) populateForm();
+        if (isOpen) {
+populateForm();
+}
     },
     { immediate: true },
 );
