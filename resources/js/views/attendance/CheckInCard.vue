@@ -16,9 +16,9 @@ import {
 
 
 // ==========
+import type { Attendance } from '@/types/attendance';
 import type { LocationOption } from '@/types/location';
 import ForgotCheckoutModal from '@/views/attendance/ForgotCheckoutModal.vue';
-import type { Attendance } from '@/types/attendance';
 
 
 const page = usePage();
@@ -265,6 +265,7 @@ const getCurrentPosition = (): Promise<GeolocationPosition> =>
             reject(new Error(
                 'Location check-in requires HTTPS.',
             ));
+
             return;
         }
 
@@ -272,6 +273,7 @@ const getCurrentPosition = (): Promise<GeolocationPosition> =>
             reject(new Error(
                 'Your browser does not support location access.',
             ));
+
             return;
         }
 
@@ -299,10 +301,13 @@ const getCurrentPosition = (): Promise<GeolocationPosition> =>
 
 const toggleCheckIn = async () => {
 
-    if (checkInPending.value) return;
+    if (checkInPending.value) {
+return;
+}
 
     if (checkedIn.value) {
         await postAttendanceAction('/attendance/check-out');
+
         return;
     }
 
@@ -311,6 +316,7 @@ const toggleCheckIn = async () => {
     if (!locationId) {
         companyError.value =
             'Please select a company or site before checking in.';
+
         return;
     }
 

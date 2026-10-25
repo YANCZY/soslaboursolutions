@@ -132,7 +132,9 @@ const confirmationAction = computed(() =>
 );
 
 const openStatusConfirmation = (site: Site) => {
-    if (!props.canManageSites || processing.value) return;
+    if (!props.canManageSites || processing.value) {
+return;
+}
 
     siteToManage.value = { ...site };
     targetStatus.value = !site.is_active;
@@ -140,7 +142,9 @@ const openStatusConfirmation = (site: Site) => {
 };
 
 const updateConfirmationOpen = (open: boolean) => {
-    if (processing.value) return;
+    if (processing.value) {
+return;
+}
 
     confirmationOpen.value = open;
 

@@ -124,28 +124,29 @@ const props = defineProps<{
     };
 }>();
 
-const userLocationLabels = (user: User) =>
-    user.location_assignments.map((assignment) => {
-        const companyName = assignment.company.company_name;
-        const siteName =
-            assignment.site?.site_name?.trim() || companyName;
 
-        const label = assignment.site_id === null
-            ? companyName
-            : `${companyName} - ${siteName}`;
+// const userLocationLabels = (user: User) =>
+//     user.location_assignments.map((assignment) => {
+//         const companyName = assignment.company.company_name;
+//         const siteName =
+//             assignment.site?.site_name?.trim() || companyName;
 
-        const isInactive =
-            !assignment.company.is_active ||
-            (
-                assignment.site_id !== null &&
-                !assignment.site?.is_active
-            );
+//         const label = assignment.site_id === null
+//             ? companyName
+//             : `${companyName} - ${siteName}`;
 
-        return {
-            id: assignment.id,
-            label: isInactive ? `${label} (Inactive)` : label,
-        };
-    });
+//         const isInactive =
+//             !assignment.company.is_active ||
+//             (
+//                 assignment.site_id !== null &&
+//                 !assignment.site?.is_active
+//             );
+
+//         return {
+//             id: assignment.id,
+//             label: isInactive ? `${label} (Inactive)` : label,
+//         };
+//     });
 
 const search = ref(props.filters.search ?? '');
 

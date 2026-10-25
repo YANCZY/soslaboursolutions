@@ -1,11 +1,5 @@
 <script setup lang="ts">
 import { Info } from 'lucide-vue-next';
-import {
-    Tooltip,
-    TooltipContent,
-    TooltipProvider,
-    TooltipTrigger,
-} from '@/components/ui/tooltip';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -24,6 +18,12 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from '@/components/ui/tooltip';
 import type { LocationOption } from '@/types/location';
 
 type AddShiftForm = {

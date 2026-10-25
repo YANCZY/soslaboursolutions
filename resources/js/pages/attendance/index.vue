@@ -1,14 +1,14 @@
 <script setup lang="ts">
 import { Head, router } from '@inertiajs/vue3';
 import { Card } from '@/components/ui/card';
+import type {
+    Attendance,
+} from '@/types/attendance';
 import type { LocationOption } from '@/types/location';
 import AttendanceTable from '@/views/attendance/AttendanceTable.vue';
 import CheckInCard from '@/views/attendance/CheckInCard.vue';
 import TotalWorkingHoursCard from '@/views/attendance/TotalWorkingHoursCard.vue';
 
-import type {
-    Attendance,
-} from '@/types/attendance';
 
 const props = defineProps<{
     todayAttendance: Attendance | null;

@@ -38,13 +38,13 @@ import {
     TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { exportBrandedPdf } from '@/lib/exportBrandedPdf';
-import type { LocationOption } from '@/types/location';
-import AddShift from '@/views/attendance/AddShift.vue';
-import EditAttendance from '@/views/attendance/EditAttendance.vue';
 import type {
     Attendance,
     AttendanceUser,
 } from '@/types/attendance';
+import type { LocationOption } from '@/types/location';
+import AddShift from '@/views/attendance/AddShift.vue';
+import EditAttendance from '@/views/attendance/EditAttendance.vue';
 
 
 
