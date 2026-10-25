@@ -101,11 +101,20 @@ class AttendanceGeofence
                 now()->addDay(),
                 fn () => $this->geoapify->geocodeAddress($address),
             );
-        } catch (ConnectionException | RequestException | RuntimeException) {
-            $this->reject(
-                'The workplace location could not be verified. '
-                . 'Please try again or contact management.'
-            );
+        } catch (ConnectionException | RequestException | RuntimeException $exception) {
+                \Illuminate\Support\Facades\Log::warning(
+                    'Attendance workplace verification failed.',
+                    [
+                        'location_key' => $locationKey,
+                        'exception_type' => get_class($exception),
+                        'http_status' => $exception instanceof RequestException
+                            ? $exception->response->status()
+                            : null,
+                        'reason' => $exception instanceof RuntimeException
+                            ? $exception->getMessage()
+                            : null,
+                    ],
+                );
         }
 
         $ageMilliseconds = microtime(true) * 1000
