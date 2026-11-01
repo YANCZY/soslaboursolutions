@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Head, Link, router } from '@inertiajs/vue3';
-import { Search, Trash2, Power, Eye } from 'lucide-vue-next';
+import { Search, Trash2, Power, Eye, Pencil } from 'lucide-vue-next';
 import {
     TabsRoot,
     TabsList,
@@ -24,6 +24,7 @@ import SettingsLayout from '@/layouts/settings/Layout.vue';
 import type { Company } from '@/types/company';
 import type { Site } from '@/types/site';
 import CompanyDetailedView from '@/views/settings/company/CompanyDetailedView.vue';
+import EditCompany from '@/views/settings/company/EditCompany.vue';
 import SitesTable from '@/views/settings/company/SitesTable.vue';
 
 
@@ -60,6 +61,9 @@ const companyToManage = ref<Company | null>(null);
 const companyDetailsOpen = ref(false);
 const selectedCompanyId = ref<number | null>(null);
 
+const companyEditOpen = ref(false);
+const companyToEdit = ref<Company | null>(null);
+
 const selectedCompany = computed(() => {
     return props.companies.data.find(
         (company) => company.id === selectedCompanyId.value,
@@ -76,6 +80,23 @@ const updateCompanyDetailsOpen = (open: boolean) => {
 
     if (!open) {
         selectedCompanyId.value = null;
+    }
+};
+
+const openCompanyEdit = (company: Company) => {
+    if (!props.can_manage_companies || processingId.value !== null) {
+        return;
+    }
+
+    companyToEdit.value = company;
+    companyEditOpen.value = true;
+};
+
+const updateCompanyEditOpen = (open: boolean) => {
+    companyEditOpen.value = open;
+
+    if (!open) {
+        companyToEdit.value = null;
     }
 };
 
@@ -344,6 +365,19 @@ defineOptions({
                                     </Button>
 
                                     <template v-if="props.can_manage_companies">
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="icon"
+                                            class="size-8 shrink-0"
+                                            :title="`Edit ${company.company_name}`"
+                                            :aria-label="`Edit ${company.company_name}`"
+                                            :disabled="processingId !== null"
+                                            @click="openCompanyEdit(company)"
+                                        >
+                                            <Pencil class="size-4" />
+                                        </Button>
+
                                         <button
                                             v-if="company.can_delete"
                                             type="button"
@@ -425,6 +459,12 @@ defineOptions({
             </TabsContent>
         </TabsRoot>
     </div>
+    <!-- Edit Company -->
+     <EditCompany
+        :open="companyEditOpen"
+        :company="companyToEdit"
+        @update:open="updateCompanyEditOpen"
+    />
 
     <!-- OPEN DETAILED VIEW MODAL -->
     <CompanyDetailedView

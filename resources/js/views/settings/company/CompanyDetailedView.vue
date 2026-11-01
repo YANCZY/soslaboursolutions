@@ -29,6 +29,7 @@ const detailFields = [
     { key: 'company_address_2', label: 'Address line 2' },
     { key: 'company_address_city', label: 'City' },
     { key: 'company_address_state', label: 'State' },
+    { key: 'company_address_zip', label: 'Postcode' },
     { key: 'company_address_country', label: 'Country' },
     {
         key: 'industry_description',

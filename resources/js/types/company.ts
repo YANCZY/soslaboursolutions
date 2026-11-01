@@ -11,6 +11,7 @@ export type Company = {
     company_address_2: string | null;
     company_address_city: string | null;
     company_address_state: string | null;
+    company_address_zip: string | null;
     company_address_country: string | null;
     is_active: boolean;
     can_delete: boolean;

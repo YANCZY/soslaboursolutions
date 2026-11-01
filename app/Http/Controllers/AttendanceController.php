@@ -81,10 +81,7 @@ class AttendanceController extends Controller
 
         $validated = $request->validate([
             'location_assignment_id' => ['required', 'integer'],
-            'latitude' => ['required', 'numeric', 'between:-90,90'],
-            'longitude' => ['required', 'numeric', 'between:-180,180'],
-            'accuracy' => ['required', 'numeric', 'min:0', 'max:100000'],
-            'captured_at' => ['required', 'integer', 'min:1'],
+            ...$this->positionRules(),
         ]);
 
         $location = app(UserLocationService::class)->resolve(
@@ -99,7 +96,7 @@ class AttendanceController extends Controller
 
         $now = now($this->userTimezone($request));
 
-        
+
         $attendance = Attendance::query()->create([
             'employee_id' => $request->user()->id,
             'check_in_date' => $now->toDateString(),
@@ -119,44 +116,73 @@ class AttendanceController extends Controller
 
     public function startLunch(Request $request): JsonResponse
     {
-        $now = now($this->userTimezone($request));
         $attendance = $this->todayAttendance($request);
 
-        if (! $attendance || $attendance->check_out_time) {
+        if (
+            ! $attendance
+            || $attendance->check_out_time
+            || $attendance->status !== 'checked_in'
+        ) {
             abort(422, 'You must be checked in before starting lunch.');
         }
 
-        if ($attendance->lunch_start_time && ! $attendance->lunch_end_time) {
-            abort(422, 'Lunch break already started.');
+        if ($attendance->lunch_start_time) {
+            abort(422, 'A lunch break has already been recorded for this shift.');
         }
+
+        $position = $request->validate($this->positionRules());
+
+        app(AttendanceGeofence::class)->assertForAttendance(
+            $attendance,
+            $position,
+        );
+
+        $now = now($this->userTimezone($request));
 
         $attendance->update([
             'status' => 'lunch_break',
             'lunch_start_time' => $now->format('H:i:s'),
         ]);
 
-        return response()->json(['attendance' => $attendance->fresh()]);
+        return response()->json([
+            'attendance' => $attendance->fresh(),
+        ]);
     }
 
     public function endLunch(Request $request): JsonResponse
     {
-        $now = now($this->userTimezone($request));
         $attendance = $this->todayAttendance($request);
 
-        if (! $attendance || ! $attendance->lunch_start_time) {
-            abort(422, 'Lunch break has not started.');
+        if (
+            ! $attendance
+            || $attendance->check_out_time
+            || ! $attendance->lunch_start_time
+            || $attendance->status !== 'lunch_break'
+        ) {
+            abort(422, 'There is no active lunch break.');
         }
 
         if ($attendance->lunch_end_time) {
             abort(422, 'Lunch break already ended.');
         }
 
+        $position = $request->validate($this->positionRules());
+
+        app(AttendanceGeofence::class)->assertForAttendance(
+            $attendance,
+            $position,
+        );
+
+        $now = now($this->userTimezone($request));
+
         $attendance->update([
             'status' => 'checked_in',
             'lunch_end_time' => $now->format('H:i:s'),
         ]);
 
-        return response()->json(['attendance' => $attendance->fresh()]);
+        return response()->json([
+            'attendance' => $attendance->fresh(),
+        ]);
     }
 
     public function checkOut(Request $request): JsonResponse
@@ -167,35 +193,39 @@ class AttendanceController extends Controller
             abort(422, 'You must check in first.');
         }
 
-        if ($attendance->lunch_start_time && ! $attendance->lunch_end_time) {
-            abort(422, 'End lunch break before checking out.');
-        }
-
         if ($attendance->check_out_time) {
             abort(422, 'You already checked out.');
         }
 
-        $checkIn = Carbon::parse($attendance->check_in_date->format('Y-m-d').' '.$attendance->check_in_time);
-        $checkOut = now($this->userTimezone($request));
+        $timezone = $this->userTimezone($request);
 
-        $lunchSeconds = 0;
-
-        if ($attendance->lunch_start_time && $attendance->lunch_end_time) {
-            $lunchStart = Carbon::parse($attendance->check_in_date->format('Y-m-d').' '.$attendance->lunch_start_time);
-            $lunchEnd = Carbon::parse($attendance->check_in_date->format('Y-m-d').' '.$attendance->lunch_end_time);
-
-            $lunchSeconds = (int) floor($lunchEnd->diffInSeconds($lunchStart, true));
-        }
-
-        $totalWorkingSeconds = (int) floor(
-            max(0, $checkOut->diffInSeconds($checkIn, true) - $lunchSeconds)
+        $checkIn = Carbon::parse(
+            $attendance->check_in_date->format('Y-m-d')
+                . ' '
+                . $attendance->check_in_time,
+            $timezone,
         );
+
+        $checkOut = now($timezone);
+
+       $checkoutValues = $this->checkoutValues(
+            $attendance,
+            $checkIn,
+            $checkOut,
+        );
+
+        $totalWorkingSeconds = $checkoutValues['total_working_seconds'];
 
 
         // Max Working hours
         $maxWorkingSeconds = $this->maxWorkingSeconds();
 
-        if ($totalWorkingSeconds > $maxWorkingSeconds) {
+        $elapsedSeconds = (int) floor(
+            $checkIn->diffInSeconds($checkOut, true)
+        );
+
+        if ($elapsedSeconds > $maxWorkingSeconds || $totalWorkingSeconds > $maxWorkingSeconds)
+        {
             return response()->json([
                 'requires_forgot_logout_modal' => true,
                 'message' => 'You forgot to logout.',
@@ -210,8 +240,7 @@ class AttendanceController extends Controller
 
         $attendance->update([
             'status' => 'checked_out',
-            'check_out_time' => $checkOut->format('H:i:s'),
-            'total_working_seconds' => $totalWorkingSeconds,
+            ...$checkoutValues,
         ]);
 
         return response()->json(['attendance' => $attendance->fresh()]);
@@ -227,7 +256,7 @@ class AttendanceController extends Controller
         return $maxWorkingSeconds;
     }
 
-    public function storeForgotCheckOut(Request $request): JsonResponse
+   public function storeForgotCheckOut(Request $request): JsonResponse
     {
         $validated = $request->validate([
             'attendance_id' => ['required', 'integer', 'exists:attendance,id'],
@@ -243,29 +272,44 @@ class AttendanceController extends Controller
             abort(422, 'Check-in time is missing.');
         }
 
+        if ($attendance->check_out_time) {
+            abort(422, 'This attendance has already been checked out.');
+        }
+
+        // Interpret both times using the same timezone.
+        $timezone = $this->userTimezone($request);
+
         $checkIn = Carbon::parse(
-            $attendance->check_in_date->format('Y-m-d') . ' ' . $attendance->check_in_time
+            $attendance->check_in_date->format('Y-m-d')
+                . ' '
+                . $attendance->check_in_time,
+            $timezone,
         );
 
         $manualCheckOut = Carbon::parse(
-            $attendance->check_in_date->format('Y-m-d') . ' ' . $validated['check_out_time']
+            $attendance->check_in_date->format('Y-m-d')
+                . ' '
+                . $validated['check_out_time'],
+            $timezone,
         );
 
+        // An earlier checkout clock time means checkout was the next day.
         if ($manualCheckOut->lessThanOrEqualTo($checkIn)) {
             $manualCheckOut->addDay();
         }
 
-        $lunchSeconds = 0;
-
-        if ($attendance->lunch_start_time && $attendance->lunch_end_time) {
-            $lunchStart = Carbon::parse($attendance->check_in_date->format('Y-m-d') . ' ' . $attendance->lunch_start_time);
-            $lunchEnd = Carbon::parse($attendance->check_in_date->format('Y-m-d') . ' ' . $attendance->lunch_end_time);
-            $lunchSeconds = (int) floor($lunchEnd->diffInSeconds($lunchStart, true));
+        if ($manualCheckOut->greaterThan(now($timezone))) {
+            abort(422, 'Check-out time cannot be in the future.');
         }
 
-        $totalWorkingSeconds = (int) floor(
-            max(0, $manualCheckOut->diffInSeconds($checkIn, true) - $lunchSeconds)
+        // Calculate working time and close an unfinished lunch.
+        $checkoutValues = $this->checkoutValues(
+            $attendance,
+            $checkIn,
+            $manualCheckOut,
         );
+
+        $totalWorkingSeconds = $checkoutValues['total_working_seconds'];
 
         $maxWorkingSeconds = $this->maxWorkingSeconds();
 
@@ -273,10 +317,10 @@ class AttendanceController extends Controller
             abort(422, 'Check-out time exceeds the maximum allowed working hours.');
         }
 
+        // Save checkout time, lunch end, and working time together.
         $attendance->update([
             'status' => 'checked_out',
-            'check_out_time' => $manualCheckOut->format('H:i:s'),
-            'total_working_seconds' => $totalWorkingSeconds,
+            ...$checkoutValues,
         ]);
 
         return response()->json([
@@ -469,6 +513,79 @@ class AttendanceController extends Controller
         return response()->json([
             'message' => 'Attendance deleted successfully.',
         ]);
+    }
+
+    private function checkoutValues(
+        Attendance $attendance,
+        Carbon $checkIn,
+        Carbon $checkOut,
+    ): array {
+        $lunchSeconds = 0;
+        $lunchEndTime = $attendance->lunch_end_time;
+
+        if ($attendance->lunch_start_time) {
+            $date = $checkIn->toDateString();
+            $timezone = $checkIn->getTimezone();
+
+            $lunchStart = Carbon::parse(
+                $date . ' ' . $attendance->lunch_start_time,
+                $timezone,
+            );
+
+            // Support lunch starting after midnight in an overnight shift.
+            if ($lunchStart->lessThan($checkIn)) {
+                $lunchStart->addDay();
+            }
+
+            if ($lunchEndTime) {
+                $lunchEnd = Carbon::parse(
+                    $date . ' ' . $lunchEndTime,
+                    $timezone,
+                );
+
+                if ($lunchEnd->lessThan($lunchStart)) {
+                    $lunchEnd->addDay();
+                }
+            } else {
+                $lunchEnd = $checkOut->copy();
+                $lunchEndTime = $checkOut->format('H:i:s');
+            }
+
+            if (
+                $lunchStart->greaterThan($checkOut)
+                || $lunchEnd->lessThan($lunchStart)
+                || $lunchEnd->greaterThan($checkOut)
+            ) {
+                abort(422, 'Check-out time must not precede the recorded lunch.');
+            }
+
+            $lunchSeconds = (int) floor(
+                $lunchStart->diffInSeconds($lunchEnd, true)
+            );
+        }
+
+        $elapsedSeconds = (int) floor(
+            $checkIn->diffInSeconds($checkOut, true)
+        );
+
+        return [
+            'check_out_time' => $checkOut->format('H:i:s'),
+            'lunch_end_time' => $lunchEndTime,
+            'total_working_seconds' => max(
+                0,
+                $elapsedSeconds - $lunchSeconds,
+            ),
+        ];
+    }
+
+    private function positionRules(): array
+    {
+        return [
+            'latitude' => ['required', 'numeric', 'between:-90,90'],
+            'longitude' => ['required', 'numeric', 'between:-180,180'],
+            'accuracy' => ['required', 'numeric', 'gt:0', 'max:100000'],
+            'captured_at' => ['required', 'integer', 'min:1'],
+        ];
     }
 
 

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { router } from '@inertiajs/vue3';
-import { Eye, Filter, Power, Search } from 'lucide-vue-next';
+import { Eye, Filter, Pencil, Power, Search } from 'lucide-vue-next';
 import { computed, ref, watch } from 'vue';
 import { toast } from 'vue-sonner';
 import { Button } from '@/components/ui/button';
@@ -19,7 +19,9 @@ import {
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
+import EditSite from '@/pages/admin/settings/Sites/EditSite.vue';
 import type { Site } from '@/types/site';
+
 
 
 const props = withDefaults(defineProps<{
@@ -47,6 +49,9 @@ const perPage = ref(10);
 
 const detailsOpen = ref(false);
 const selectedSite = ref<Site | null>(null);
+
+const editOpen = ref(false);
+const siteToEdit = ref<Site | null>(null);
 
 const columns = [
     { key: 'site_name', label: 'Site Name' },
@@ -120,6 +125,23 @@ watch(totalPages, (value) => {
 const openDetails = (site: Site) => {
     selectedSite.value = site;
     detailsOpen.value = true;
+};
+
+const openEdit = (site: Site) => {
+    if (!props.canManageSites || processing.value) {
+        return;
+    }
+
+    siteToEdit.value = site;
+    editOpen.value = true;
+};
+
+const updateEditOpen = (open: boolean) => {
+    editOpen.value = open;
+
+    if (!open) {
+        siteToEdit.value = null;
+    }
 };
 
 const confirmationOpen = ref(false);
@@ -310,6 +332,20 @@ const confirmStatusChange = () => {
                                         <Eye class="size-4" />
                                     </Button>
 
+                                    <Button
+                                        v-if="props.canManageSites"
+                                        type="button"
+                                        variant="outline"
+                                        size="icon"
+                                        class="size-8 shrink-0"
+                                        :title="`Edit ${siteValues(site).site_name}`"
+                                        :aria-label="`Edit ${siteValues(site).site_name}`"
+                                        :disabled="processing"
+                                        @click="openEdit(site)"
+                                    >
+                                        <Pencil class="size-4" />
+                                    </Button>
+
                                     <button
                                         v-if="props.canManageSites"
                                         type="button"
@@ -432,6 +468,12 @@ const confirmStatusChange = () => {
             </dl>
         </DialogContent>
     </Dialog>
+    <!-- EDIT SITE -->
+     <EditSite
+        :open="editOpen"
+        :site="siteToEdit"
+        @update:open="updateEditOpen"
+    />
     <!-- UPDATE SITE STATUS -->
     <Dialog
         :open="confirmationOpen"

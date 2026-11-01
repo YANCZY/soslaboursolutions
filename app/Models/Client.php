@@ -23,6 +23,7 @@ use Illuminate\Validation\ValidationException;
     'company_address_2',
     'company_address_city',
     'company_address_state',
+    'company_address_zip',
     'company_address_country',
 
 ])]
@@ -44,6 +45,10 @@ class Client extends Model
     {
         return [
             'is_active' => 'boolean',
+            'geofence_latitude' => 'float',
+            'geofence_longitude' => 'float',
+            'geofence_radius_meters' => 'integer',
+            'geofence_geocoded_at' => 'datetime',
         ];
     }
 
