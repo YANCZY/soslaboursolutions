@@ -32,6 +32,7 @@ class CompanySettingsController extends Controller
                     'company_address_2',
                     'company_address_city',
                     'company_address_state',
+                    'company_address_zip',
                     'company_address_country',
                     'is_active',
                 ])
@@ -102,6 +103,67 @@ class CompanySettingsController extends Controller
         ]);
     }
 
+    public function updateCompany(
+        Request $request,
+        Client $client,
+    ): RedirectResponse {
+        abort_unless(
+            in_array(
+                $request->user()->userType?->user_type_name,
+                ['Superadmin', 'SOS Admin'],
+                true,
+            ),
+            403,
+        );
+
+        $validated = $request->validate([
+            'company_name' => ['required', 'string', 'max:255'],
+            'company_type' => ['nullable', 'string', 'max:100'],
+            'trade' => ['nullable', 'string', 'max:100'],
+            'industry' => ['nullable', 'string', 'max:100'],
+            'industry_description' => ['nullable', 'string', 'max:10000'],
+            'phone' => ['nullable', 'string', 'max:20'],
+            'website' => ['nullable', 'url:http,https', 'max:255'],
+            'company_address' => ['nullable', 'string', 'max:255'],
+            'company_address_2' => ['nullable', 'string', 'max:255'],
+            'company_address_city' => ['nullable', 'string', 'max:255'],
+            'company_address_state' => ['nullable', 'string', 'max:255'],
+            'company_address_zip' => ['nullable', 'string', 'max:20'],
+            'company_address_country' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        DB::transaction(function () use ($client, $validated): void {
+            $company = Client::query()
+                ->whereKey($client->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $company->fill($validated);
+
+            $addressChanged = $company->isDirty([
+                'company_address',
+                'company_address_2',
+                'company_address_city',
+                'company_address_state',
+                'company_address_zip',
+                'company_address_country',
+            ]);
+
+            if ($addressChanged) {
+                $company->forceFill([
+                    'geofence_latitude' => null,
+                    'geofence_longitude' => null,
+                    'geofence_address_hash' => null,
+                    'geofence_geocoded_at' => null,
+                ]);
+            }
+
+            $company->save();
+        });
+
+        return back();
+    }
+
     public function destroy(Client $client): RedirectResponse
     {
         DB::transaction(function () use ($client) {
@@ -117,6 +179,63 @@ class CompanySettingsController extends Controller
             }
 
             $company->delete();
+        });
+
+        return back();
+    }
+
+    public function updateSite(Request $request, Site $site): RedirectResponse
+    {
+        abort_unless(
+            in_array(
+                $request->user()->userType?->user_type_name,
+                ['Superadmin', 'SOS Admin'],
+                true,
+            ),
+            403,
+        );
+
+        $validated = $request->validate([
+            'site_name' => ['nullable', 'string', 'max:255'],
+            'street' => ['required', 'string', 'max:255'],
+            'city' => ['required', 'string', 'max:100'],
+            'state' => ['required', 'string', 'max:100'],
+            'postcode' => ['required', 'string', 'max:20'],
+            'country' => ['required', 'string', 'max:100'],
+        ]);
+
+        DB::transaction(function () use ($site, $validated): void {
+            // Keep the same company-before-site locking order used elsewhere.
+            Client::query()
+                ->whereKey($site->client_id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $record = Site::query()
+                ->whereKey($site->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $record->fill($validated);
+
+            $addressChanged = $record->isDirty([
+                'street',
+                'city',
+                'state',
+                'postcode',
+                'country',
+            ]);
+
+            if ($addressChanged) {
+                $record->forceFill([
+                    'geofence_latitude' => null,
+                    'geofence_longitude' => null,
+                    'geofence_address_hash' => null,
+                    'geofence_geocoded_at' => null,
+                ]);
+            }
+
+            $record->save();
         });
 
         return back();

@@ -22,6 +22,10 @@ class Site extends Model
     {
         return [
             'is_active' => 'boolean',
+            'geofence_latitude' => 'float',
+            'geofence_longitude' => 'float',
+            'geofence_radius_meters' => 'integer',
+            'geofence_geocoded_at' => 'datetime',
         ];
     }
 

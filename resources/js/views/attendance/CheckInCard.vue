@@ -263,7 +263,7 @@ const getCurrentPosition = (): Promise<GeolocationPosition> =>
     new Promise((resolve, reject) => {
         if (!window.isSecureContext) {
             reject(new Error(
-                'Location check-in requires HTTPS.',
+                'Location verification requires HTTPS.',
             ));
 
             return;
@@ -281,7 +281,7 @@ const getCurrentPosition = (): Promise<GeolocationPosition> =>
             resolve,
             (error) => {
                 const messages: Record<number, string> = {
-                    1: 'Allow location access to check in.',
+                    1: 'Allow location access for this attendance action.',
                     2: 'Your location is unavailable. Enable location services and try again.',
                     3: 'Getting your location timed out. Please try again.',
                 };
@@ -345,13 +345,34 @@ return;
 };
 
 const toggleLunchBreak = async () => {
-    if (onLunchBreak.value) {
-        await postAttendanceAction('/attendance/lunch/end');
-
+    if (checkInPending.value) {
         return;
     }
 
-    await postAttendanceAction('/attendance/lunch/start');
+    checkInPending.value = true;
+
+    try {
+        const position = await getCurrentPosition();
+
+        const endpoint = onLunchBreak.value
+            ? '/attendance/lunch/end'
+            : '/attendance/lunch/start';
+
+        await postAttendanceAction(endpoint, {
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+            accuracy: position.coords.accuracy,
+            captured_at: Math.round(position.timestamp),
+        });
+    } catch (error) {
+        toast.error(
+            error instanceof Error
+                ? error.message
+                : 'Unable to verify your location.',
+        );
+    } finally {
+        checkInPending.value = false;
+    }
 };
 
 const saveForgotLogout = async () => {
@@ -550,6 +571,7 @@ class="h-10 flex-1"
                                     : 'dark:border-border dark:bg-muted/20 dark:text-muted-foreground dark:hover:bg-muted/40'
                             "
                             @click="toggleLunchBreak"
+                            :disabled="checkInPending"
                         >
                             <Coffee class="size-4" />
                         </Button>

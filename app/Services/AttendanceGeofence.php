@@ -3,26 +3,25 @@
 namespace App\Services;
 
 use App\Models\UserLocationAssignment;
-use App\Services\Geoapify\GeoapifyClient;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\RequestException;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Validation\ValidationException;
+use App\Models\Attendance;
+use App\Models\Client;
+use App\Models\Site;
 use RuntimeException;
 
 class AttendanceGeofence
 {
     public function __construct(
-        private readonly GeoapifyClient $geoapify,
-    ) {}
+            private readonly WorkplaceCoordinates $workplaceCoordinates,
+        ) {}
 
-    public function assertWithin(
+        public function assertWithin(
         UserLocationAssignment $assignment,
         array $position,
     ): void {
-        $isSite = $assignment->site_id !== null;
-
-        $target = $isSite
+        $target = $assignment->site_id !== null
             ? $assignment->site
             : $assignment->company;
 
@@ -30,47 +29,57 @@ class AttendanceGeofence
             $this->reject('The selected workplace is unavailable.');
         }
 
-        $street = $isSite
-            ? $target->street
-            : $target->company_address;
-
-        if (trim((string) $street) === '') {
-            $this->reject(
-                'This workplace has no address. Contact management.'
-            );
+        if (
+            $target instanceof Site
+            && (int) $target->client_id !== (int) $assignment->client_id
+        ) {
+            $this->reject('The selected workplace is invalid.');
         }
 
-        $parts = $isSite
-            ? [
-                $target->street,
-                $target->city,
-                $target->state,
-                $target->postcode,
-                $target->country,
-            ]
-            : [
-                $target->company_address,
-                $target->company_address_2,
-                $target->company_address_city,
-                $target->company_address_state,
-                $target->company_address_zip,
-                $target->company_address_country,
-            ];
+        $this->assertAtWorkplace($target, $position);
+    }
 
-        $address = collect($parts)
-            ->map(fn ($part) => trim((string) $part))
-            ->filter(fn ($part) => $part !== '')
-            ->implode(', ');
+    public function assertForAttendance(
+        Attendance $attendance,
+        array $position,
+    ): void {
+        $company = Client::query()->find($attendance->client_id);
 
-        $locationKey = $isSite
-            ? 'site:' . $assignment->site_id
-            : 'company:' . $assignment->client_id;
+        if (! $company) {
+            $this->reject('The attendance workplace is unavailable.');
+        }
+
+        if ($attendance->site_id !== null) {
+            $target = Site::query()
+                ->whereKey($attendance->site_id)
+                ->where('client_id', $company->id)
+                ->first();
+
+            if (! $target) {
+                $this->reject('The attendance site is unavailable.');
+            }
+        } else {
+            $target = $company;
+        }
+
+        $this->assertAtWorkplace($target, $position);
+    }
+
+    private function assertAtWorkplace(
+        Client|Site $target,
+        array $position,
+    ): void {
+        $locationKey = $target instanceof Site
+            ? 'site:' . $target->getKey()
+            : 'company:' . $target->getKey();
+
 
         $radii = config('attendance.location_radii', []);
 
         $radius = (float) (
-            $radii[$locationKey]
-            ?? config('attendance.check_in_radius_meters', 10)
+            $target->geofence_radius_meters
+            ?? $radii[$locationKey]
+            ?? config('attendance.check_in_radius_meters', 100)
         );
 
         if (! is_finite($radius) || $radius <= 0) {
@@ -81,7 +90,16 @@ class AttendanceGeofence
 
         $accuracy = (float) $position['accuracy'];
 
-        if ($accuracy > $radius) {
+        $maxAccuracy = min(
+            $radius,
+            (float) config('attendance.max_accuracy_meters', 50),
+        );
+
+        if (
+            ! is_finite($accuracy)
+            || $accuracy <= 0
+            || $accuracy > $maxAccuracy
+        ) {
             $this->reject(
                 'Your location is not accurate enough. Enable precise '
                 . 'location, move to an open area, and try again.'
@@ -89,32 +107,23 @@ class AttendanceGeofence
         }
 
         try {
-            // Explicitly use file caching, not the database cache store.
-            // Address changes produce a different cache key.
-            $cacheKey = 'attendance-geocode-v1:' . hash(
-                'sha256',
-                $address . ':' . config('services.geoapify.country_code', 'au')
+            $workplace = $this->workplaceCoordinates->resolve($target);
+        } catch (ConnectionException | RequestException | RuntimeException $exception) {
+            \Illuminate\Support\Facades\Log::warning(
+                'Attendance workplace verification failed.',
+                [
+                    'location_key' => $locationKey,
+                    'exception_type' => get_class($exception),
+                    'http_status' => $exception instanceof RequestException
+                        ? $exception->response->status()
+                        : null,
+                ],
             );
 
-            $workplace = Cache::store('file')->remember(
-                $cacheKey,
-                now()->addDay(),
-                fn () => $this->geoapify->geocodeAddress($address),
+            $this->reject(
+                'The workplace location could not be verified. '
+                . 'Please try again or contact management.'
             );
-        } catch (ConnectionException | RequestException | RuntimeException $exception) {
-                \Illuminate\Support\Facades\Log::warning(
-                    'Attendance workplace verification failed.',
-                    [
-                        'location_key' => $locationKey,
-                        'exception_type' => get_class($exception),
-                        'http_status' => $exception instanceof RequestException
-                            ? $exception->response->status()
-                            : null,
-                        'reason' => $exception instanceof RuntimeException
-                            ? $exception->getMessage()
-                            : null,
-                    ],
-                );
         }
 
         $ageMilliseconds = microtime(true) * 1000
@@ -141,9 +150,9 @@ class AttendanceGeofence
         // Require the reported position and its accuracy margin
         // to fit inside the boundary.
         if ($distance + $accuracy > $radius) {
-            $this->reject(
+           $this->reject(
                 'You must be within ' . $radius
-                . ' metres of the selected workplace to check in. '
+                . ' metres of the workplace for this attendance action. '
                 . 'Move closer and try again.'
             );
         }

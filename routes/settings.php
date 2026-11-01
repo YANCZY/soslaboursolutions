@@ -83,9 +83,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
             Route::patch('settings/users/{user}/toggle-status', [UserSettingsController::class, 'toggleStatus'])
                 ->name('settings.users.toggle-status');
 
+            Route::patch('settings/company/{client}', [CompanySettingsController::class, 'updateCompany'],)->name('settings.company.update');
+
             Route::delete('settings/company/{client}',[CompanySettingsController::class, 'destroy'])->name('settings.company.destroy');
 
             Route::patch('settings/company/{client}/status', [CompanySettingsController::class, 'updateStatus'])->name('settings.company.status');
+
+            Route::patch('settings/company/sites/{site}', [CompanySettingsController::class, 'updateSite'],)->name('settings.company.sites.update');
 
             Route::patch('settings/company/sites/{site}/status', [CompanySettingsController::class, 'updateSiteStatus'],)->name('settings.company.sites.status');
 

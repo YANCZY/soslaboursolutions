@@ -52,15 +52,30 @@ Route::middleware([
     Route::post('attendance', [AttendanceController::class, 'store'])
     ->middleware('active-company:attendance')
         ->name('attendance.store');
+
+
     Route::post('attendance/check-in', [AttendanceController::class, 'checkIn'])
-        ->middleware('active-company:attendance')
-        ->name('attendance.check-in');
+    ->middleware([
+        \App\Http\Middleware\PrepareAttendanceWorkplace::class,
+        'active-company:attendance',
+    ])
+    ->name('attendance.check-in');
+
     Route::post('attendance/lunch/start', [AttendanceController::class, 'startLunch'])
-        ->middleware('active-company:attendance')
+        ->middleware([
+            \App\Http\Middleware\PrepareAttendanceWorkplace::class,
+            'active-company:attendance',
+        ])
         ->name('attendance.lunch.start');
+
     Route::post('attendance/lunch/end', [AttendanceController::class, 'endLunch'])
-        ->middleware('active-company:attendance')
+        ->middleware([
+            \App\Http\Middleware\PrepareAttendanceWorkplace::class,
+            'active-company:attendance',
+        ])
         ->name('attendance.lunch.end');
+
+
     Route::post('attendance/check-out', [AttendanceController::class, 'checkOut'])
         ->middleware('active-company:attendance')
         ->name('attendance.check-out');
