@@ -18,10 +18,12 @@ import type { Company } from '@/types/company';
 const props = defineProps<{
     open: boolean;
     company: Company | null;
+    canManage?: boolean;
 }>();
 
 const emit = defineEmits<{
     'update:open': [value: boolean];
+    'pin-location': [companyId: number];
 }>();
 
 const form = useForm({
@@ -86,17 +88,23 @@ const updateOpen = (open: boolean) => {
     emit('update:open', open);
 };
 
-const save = () => {
+const save = (pinAfterSave = false) => {
     if (!props.company || form.processing) {
         return;
     }
 
-    form.patch(`/settings/company/${props.company.id}`, {
+    const companyId = props.company.id;
+
+    form.patch(`/settings/company/${companyId}`, {
         preserveScroll: true,
         preserveState: true,
         onSuccess: () => {
             emit('update:open', false);
             toast.success('Company updated.');
+
+            if (pinAfterSave) {
+                emit('pin-location', companyId);
+            }
         },
         onError: () => {
             toast.error(
@@ -126,7 +134,7 @@ const save = () => {
                 </DialogDescription>
             </DialogHeader>
 
-            <form class="space-y-4" @submit.prevent="save">
+            <form class="space-y-4" @submit.prevent="save()">
                 <fieldset
                     :disabled="form.processing"
                     class="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2"
@@ -191,6 +199,28 @@ const save = () => {
                         </p>
                     </div>
                 </fieldset>
+
+                <div v-if="company" class="space-y-3 border-t pt-4">
+                    <p class="text-sm">
+                        Location:
+                        {{ company.geofence_pinned_at ? 'Confirmed' : 'Not pinned' }}
+                    </p>
+
+                    <p class="text-sm text-muted-foreground">
+                        Save your changes, then select the company workplace on the map.
+                        Changing the address requires confirming its location again.
+                    </p>
+
+                    <Button
+                        v-if="canManage"
+                        type="button"
+                        variant="outline"
+                        :disabled="form.processing || !company.is_active"
+                        @click="save(true)"
+                    >
+                        {{ form.processing ? 'Saving...' : 'Save & Pin Location' }}
+                    </Button>
+                </div>
 
                 <DialogFooter>
                     <Button

@@ -15,4 +15,8 @@ export type Company = {
     company_address_country: string | null;
     is_active: boolean;
     can_delete: boolean;
+    geofence_latitude: number | null;
+    geofence_longitude: number | null;
+    geofence_pinned_at: string | null;
+    geofence_radius_meters: number | null;
 };

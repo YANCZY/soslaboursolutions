@@ -92,7 +92,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
             Route::patch('settings/company/sites/{site}', [CompanySettingsController::class, 'updateSite'],)->name('settings.company.sites.update');
 
             Route::patch('settings/company/sites/{site}/status', [CompanySettingsController::class, 'updateSiteStatus'],)->name('settings.company.sites.status');
+            Route::patch('settings/company/sites/{site}/location', [CompanySettingsController::class, 'pinSiteLocation'],)->name('settings.company.sites.location');
+            Route::get('settings/company/{client}/location',[CompanySettingsController::class, 'companyLocation'],)->name('settings.company.location.show');
 
+            Route::patch('settings/company/{client}/location',[CompanySettingsController::class, 'pinCompanyLocation'],)->name('settings.company.location.update');
         });
 
 

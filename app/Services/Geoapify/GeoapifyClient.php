@@ -19,9 +19,6 @@ class GeoapifyClient
         $response = $this->request()
             ->get('/v1/geocode/search', [
                 'text' => $address,
-                'filter' => 'countrycode:' . strtolower(
-                    (string) config('services.geoapify.country_code', 'au')
-                ),
                 'format' => 'json',
                 'lang' => 'en',
                 'limit' => 1,
@@ -74,15 +71,6 @@ class GeoapifyClient
             ->get('/v1/geocode/search', [
                 'text' => $searchText,
                 'type' => 'city',
-                'filter' => sprintf(
-                    'countrycode:%s',
-                    strtolower(
-                        (string) config(
-                            'services.geoapify.country_code',
-                            'au',
-                        ),
-                    ),
-                ),
                 'format' => 'json',
                 'lang' => 'en',
                 'limit' => 1,

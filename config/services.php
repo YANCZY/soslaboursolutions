@@ -41,7 +41,6 @@ return [
             'https://api.geoapify.com',
         ),
         'api_key' => env('GEOAPIFY_API_KEY'),
-        'country_code' => env('GEOAPIFY_COUNTRY_CODE', 'au'),
         'result_limit' => (int) env(
             'GEOAPIFY_RESULT_LIMIT',
             60,

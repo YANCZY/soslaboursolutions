@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\Attendance;
 use Carbon\Carbon;
+use Carbon\CarbonInterface;
 use Illuminate\Http\JsonResponse;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -517,8 +518,8 @@ class AttendanceController extends Controller
 
     private function checkoutValues(
         Attendance $attendance,
-        Carbon $checkIn,
-        Carbon $checkOut,
+        CarbonInterface $checkIn,
+        CarbonInterface $checkOut,
     ): array {
         $lunchSeconds = 0;
         $lunchEndTime = $attendance->lunch_end_time;
