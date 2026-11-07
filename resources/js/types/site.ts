@@ -11,4 +11,8 @@ export type Site = {
     state: string;
     postcode: string;
     country: string;
+    geofence_latitude: number | null;
+    geofence_longitude: number | null;
+    geofence_pinned_at: string | null;
+    geofence_radius_meters: number | null;
 };

@@ -22,6 +22,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
     'update:open': [value: boolean];
+    'pin-location': [siteId: number];
 }>();
 
 const form = useForm({
@@ -69,20 +70,28 @@ const updateOpen = (open: boolean) => {
     emit('update:open', open);
 };
 
-const save = () => {
+const save = (pinAfterSave = false) => {
     if (!props.site || form.processing) {
         return;
     }
 
-    form.patch(`/settings/company/sites/${props.site.id}`, {
+    const siteId = props.site.id;
+
+    form.patch(`/settings/company/sites/${siteId}`, {
         preserveScroll: true,
         preserveState: true,
         onSuccess: () => {
             emit('update:open', false);
             toast.success('Site updated.');
+
+            if (pinAfterSave) {
+                emit('pin-location', siteId);
+            }
         },
         onError: () => {
-            toast.error('Unable to save the site. Check the highlighted fields.');
+            toast.error(
+                'Unable to save the site. Check the highlighted fields.',
+            );
         },
     });
 };
@@ -107,7 +116,7 @@ const save = () => {
                 </DialogDescription>
             </DialogHeader>
 
-            <form class="space-y-4" @submit.prevent="save">
+            <form class="space-y-4" @submit.prevent="save()">
                 <div class="space-y-2">
                     <Label for="edit-site-company">Company</Label>
                     <Input
@@ -153,6 +162,31 @@ const save = () => {
                         </p>
                     </div>
                 </fieldset>
+
+                <div v-if="site" class="space-y-3 border-t pt-4">
+                    <p class="text-sm">
+                        Location:
+                        {{ site.geofence_pinned_at ? 'Confirmed' : 'Not pinned' }}
+                    </p>
+
+                    <p class="text-sm text-muted-foreground">
+                        Save your changes, then select the workplace location on the map.
+                        Changing the address requires confirming the location again.
+                    </p>
+
+                    <Button
+                        type="button"
+                        variant="outline"
+                        :disabled="form.processing || !site.is_active"
+                        @click="save(true)"
+                    >
+                        {{ form.processing ? 'Saving...' : 'Save & Pin Location' }}
+                    </Button>
+
+                    <p v-if="!site.is_active" class="text-sm text-muted-foreground">
+                        Activate this site before pinning its location.
+                    </p>
+                </div>
 
                 <DialogFooter>
                     <Button

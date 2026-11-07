@@ -21,6 +21,7 @@ import {
 import { Input } from '@/components/ui/input';
 import EditSite from '@/pages/admin/settings/Sites/EditSite.vue';
 import type { Site } from '@/types/site';
+import PinSiteLocation from '@/views/settings/company/PinSiteLocation.vue';
 
 
 
@@ -49,6 +50,33 @@ const perPage = ref(10);
 
 const detailsOpen = ref(false);
 const selectedSite = ref<Site | null>(null);
+const siteToPin = ref<Site | null>(null);
+
+const openPinLocation = (site: Site) => {
+    if (!props.canManageSites || !site.is_active) {
+        return;
+    }
+
+    detailsOpen.value = false;
+    siteToPin.value = site;
+};
+
+const openPinFromEdit = (siteId: number) => {
+    if (!props.canManageSites) {
+        return;
+    }
+
+    const site = props.sites.find((item) => item.id === siteId);
+
+    if (!site) {
+        toast.error('Unable to find the updated site. Refresh and try again.');
+
+        return;
+    }
+
+    openPinLocation(site);
+};
+
 
 const editOpen = ref(false);
 const siteToEdit = ref<Site | null>(null);
@@ -466,6 +494,32 @@ const confirmStatusChange = () => {
                     </dd>
                 </div>
             </dl>
+            <!-- MAP BUTTON -->
+            <div v-if="selectedSite" class="space-y-3 border-t pt-4">
+                <p class="text-sm">
+                    Location:
+                    {{ selectedSite.geofence_pinned_at ? 'Confirmed' : 'Not pinned' }}
+                </p>
+
+                <p class="text-sm">
+                    Max Distance:
+                    {{
+                        selectedSite.geofence_radius_meters !== null
+                            ? `${selectedSite.geofence_radius_meters} m`
+                            : 'Default — configure in Pin Location'
+                    }}
+                </p>
+
+                <p v-if="selectedSite.geofence_pinned_at" class="text-sm text-muted-foreground">
+                    Latitude: {{ selectedSite.geofence_latitude }}<br>
+                    Longitude: {{ selectedSite.geofence_longitude }}
+                </p>
+
+                <Button v-if="props.canManageSites" type="button" :disabled="!selectedSite.is_active || processing"
+                    @click="openPinLocation(selectedSite)">
+                    {{ selectedSite.geofence_pinned_at ? 'Update Pinned Location' : 'Pin Location' }}
+                </Button>
+            </div>
         </DialogContent>
     </Dialog>
     <!-- EDIT SITE -->
@@ -473,6 +527,7 @@ const confirmStatusChange = () => {
         :open="editOpen"
         :site="siteToEdit"
         @update:open="updateEditOpen"
+        @pin-location="openPinFromEdit"
     />
     <!-- UPDATE SITE STATUS -->
     <Dialog
@@ -525,4 +580,6 @@ const confirmStatusChange = () => {
             </DialogFooter>
         </DialogContent>
     </Dialog>
+    <PinSiteLocation v-if="siteToPin && props.canManageSites" :key="siteToPin.id" :site="siteToPin"
+        @close="siteToPin = null" />
 </template>

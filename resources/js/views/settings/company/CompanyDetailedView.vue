@@ -13,10 +13,12 @@ import type { Company } from '@/types/company';
 defineProps<{
     open: boolean;
     company: Company | null;
+    canManage?: boolean;
 }>();
 
 const emit = defineEmits<{
     'update:open': [value: boolean];
+    'pin-location': [companyId: number];
 }>();
 
 const detailFields = [
@@ -95,6 +97,38 @@ const displayValue = (value: string | null): string => {
                         </dd>
                     </div>
                 </dl>
+                <div class="space-y-3 border-t pt-4">
+                    <p class="text-sm">
+                        Location:
+                        {{ company.geofence_pinned_at ? 'Confirmed' : 'Not pinned' }}
+                    </p>
+
+                    <p class="text-sm">
+                        Max Distance:
+                        {{
+                            company.geofence_radius_meters !== null
+                                ? `${company.geofence_radius_meters} m`
+                                : 'Default — configure in Pin Location'
+                        }}
+                    </p>
+
+                    <p
+                        v-if="company.geofence_pinned_at"
+                        class="text-sm text-muted-foreground"
+                    >
+                        Latitude: {{ company.geofence_latitude }}<br>
+                        Longitude: {{ company.geofence_longitude }}
+                    </p>
+
+                    <Button
+                        v-if="canManage"
+                        type="button"
+                        :disabled="!company.is_active"
+                        @click="emit('pin-location', company.id)"
+                    >
+                        {{ company.geofence_pinned_at ? 'Update Pinned Location' : 'Pin Location' }}
+                    </Button>
+                </div>
             </div>
 
             <DialogFooter>

@@ -88,24 +88,6 @@ class AttendanceGeofence
             );
         }
 
-        $accuracy = (float) $position['accuracy'];
-
-        $maxAccuracy = min(
-            $radius,
-            (float) config('attendance.max_accuracy_meters', 50),
-        );
-
-        if (
-            ! is_finite($accuracy)
-            || $accuracy <= 0
-            || $accuracy > $maxAccuracy
-        ) {
-            $this->reject(
-                'Your location is not accurate enough. Enable precise '
-                . 'location, move to an open area, and try again.'
-            );
-        }
-
         try {
             $workplace = $this->workplaceCoordinates->resolve($target);
         } catch (ConnectionException | RequestException | RuntimeException $exception) {
@@ -147,10 +129,9 @@ class AttendanceGeofence
             (float) $workplace['longitude'],
         );
 
-        // Require the reported position and its accuracy margin
-        // to fit inside the boundary.
-        if ($distance + $accuracy > $radius) {
-           $this->reject(
+        // Compare the reported position directly with the saved workplace pin.
+        if ($distance > $radius) {
+            $this->reject(
                 'You must be within ' . $radius
                 . ' metres of the workplace for this attendance action. '
                 . 'Move closer and try again.'

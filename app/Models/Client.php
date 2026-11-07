@@ -49,6 +49,8 @@ class Client extends Model
             'geofence_longitude' => 'float',
             'geofence_radius_meters' => 'integer',
             'geofence_geocoded_at' => 'datetime',
+            'geofence_pinned_at' => 'datetime',
+            'geofence_pinned_by' => 'integer',
         ];
     }
 

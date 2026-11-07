@@ -95,9 +95,15 @@ class PrepareAttendanceWorkplace
             $target = $company;
         }
 
+        if ($target->geofence_pinned_at === null) {
+            $this->reject(
+                'An administrator must pin this workplace location before attendance can be recorded.'
+            );
+        }
+
         try {
             // Runs before the attendance-write transaction.
-            $this->coordinates->resolve($target, true);
+            $this->coordinates->resolve($target);
         } catch (ConnectionException | RequestException | RuntimeException $exception) {
             Log::warning(
                 'Attendance workplace preparation failed.',

@@ -25,6 +25,7 @@ import type { Company } from '@/types/company';
 import type { Site } from '@/types/site';
 import CompanyDetailedView from '@/views/settings/company/CompanyDetailedView.vue';
 import EditCompany from '@/views/settings/company/EditCompany.vue';
+import PinLocation from '@/views/settings/company/PinLocation.vue';
 import SitesTable from '@/views/settings/company/SitesTable.vue';
 
 
@@ -64,6 +65,43 @@ const selectedCompanyId = ref<number | null>(null);
 const companyEditOpen = ref(false);
 const companyToEdit = ref<Company | null>(null);
 
+type CompanyPin = Pick<
+    Company,
+    | 'id'
+    | 'company_name'
+    | 'is_active'
+    | 'company_address'
+    | 'company_address_2'
+    | 'company_address_city'
+    | 'company_address_state'
+    | 'company_address_zip'
+    | 'company_address_country'
+    | 'geofence_latitude'
+    | 'geofence_longitude'
+    | 'geofence_pinned_at'
+    | 'geofence_radius_meters'
+>;
+
+const companyToPin = ref<CompanyPin | null>(null);
+const loadingCompanyPin = ref(false);
+
+const companyPinAddress = computed(() => {
+    const company = companyToPin.value;
+
+    if (!company) {
+        return '';
+    }
+
+    return [
+        company.company_address,
+        company.company_address_2,
+        company.company_address_city,
+        company.company_address_state,
+        company.company_address_zip,
+        company.company_address_country,
+    ].filter(Boolean).join(', ');
+});
+
 const selectedCompany = computed(() => {
     return props.companies.data.find(
         (company) => company.id === selectedCompanyId.value,
@@ -97,6 +135,50 @@ const updateCompanyEditOpen = (open: boolean) => {
 
     if (!open) {
         companyToEdit.value = null;
+    }
+};
+
+const openCompanyPin = async (companyId: number) => {
+    if (
+        !props.can_manage_companies
+        || loadingCompanyPin.value
+        || processingId.value !== null
+    ) {
+        return;
+    }
+
+    loadingCompanyPin.value = true;
+
+    try {
+        const response = await fetch(
+            `/settings/company/${companyId}/location`,
+            {
+                credentials: 'same-origin',
+                headers: { Accept: 'application/json' },
+            },
+        );
+
+        if (!response.ok) {
+            throw new Error('Unable to load the company location.');
+        }
+
+        const data = await response.json() as {
+            company: CompanyPin;
+        };
+
+        if (!data.company.is_active) {
+            toast.error('Activate the company before pinning its location.');
+
+            return;
+        }
+
+        updateCompanyDetailsOpen(false);
+        updateCompanyEditOpen(false);
+        companyToPin.value = data.company;
+    } catch {
+        toast.error('Unable to open the company location. Refresh and try again.');
+    } finally {
+        loadingCompanyPin.value = false;
     }
 };
 
@@ -463,14 +545,18 @@ defineOptions({
      <EditCompany
         :open="companyEditOpen"
         :company="companyToEdit"
+        :can-manage="props.can_manage_companies"
         @update:open="updateCompanyEditOpen"
+        @pin-location="openCompanyPin"
     />
 
     <!-- OPEN DETAILED VIEW MODAL -->
     <CompanyDetailedView
         :open="companyDetailsOpen && selectedCompany !== null"
         :company="selectedCompany"
+        :can-manage="props.can_manage_companies"
         @update:open="updateCompanyDetailsOpen"
+        @pin-location="openCompanyPin"
     />
 
     <Dialog
@@ -522,6 +608,18 @@ defineOptions({
             </DialogFooter>
         </DialogContent>
     </Dialog>
+
+    <PinLocation
+        v-if="companyToPin && props.can_manage_companies"
+        :key="`company-${companyToPin.id}`"
+        :name="companyToPin.company_name"
+        :address="companyPinAddress"
+        :latitude="companyToPin.geofence_latitude"
+        :longitude="companyToPin.geofence_longitude"
+        :radius-meters="companyToPin.geofence_radius_meters"
+        :save-url="`/settings/company/${companyToPin.id}/location`"
+        @close="companyToPin = null"
+    />
 
 </SettingsLayout>
 </template>
