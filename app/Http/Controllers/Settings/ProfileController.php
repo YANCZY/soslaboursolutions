@@ -13,6 +13,9 @@ use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
 use Inertia\Response;
 use App\Services\UserLocationService;
+use App\Models\User;
+use App\Services\ProfileFileCleanup;
+use Illuminate\Support\Facades\DB;
 
 class ProfileController extends Controller
 {
@@ -54,6 +57,24 @@ class ProfileController extends Controller
             'workDetail' => $workDetail,
             'workDetails' => $request->user()->companyWorkDetails()->get(),
             'selectedLocationId' => $selectedLocationId,
+            'documents' => DB::table('profile_documents')
+                ->where('user_id', $request->user()->id)
+                ->latest('id')
+                ->get([
+                    'id',
+                    'category',
+                    'original_name',
+                    'mime_type',
+                    'size',
+                ])
+                ->map(fn ($document) => [
+                    'id' => $document->id,
+                    'category' => $document->category,
+                    'original_name' => $document->original_name,
+                    'mime_type' => $document->mime_type,
+                    'size' => $document->size,
+                    'url' => route('profile.documents.show', $document->id),
+                ]),
         ]);
     }
 
@@ -90,16 +111,54 @@ class ProfileController extends Controller
     /**
      * Delete the user's profile.
      */
-    public function destroy(ProfileDeleteRequest $request): RedirectResponse
+    public function destroy(ProfileDeleteRequest $request,ProfileFileCleanup $cleanup,): RedirectResponse
     {
-        $user = $request->user();
+        $userId = $request->user()->id;
+
+        $deletionIds = DB::transaction(function () use (
+            $userId,
+            $cleanup,
+        ) {
+            $user = User::query()
+                ->lockForUpdate()
+                ->findOrFail($userId);
+
+            $ids = [];
+
+            foreach (array_filter([
+                $user->profile_photo_path,
+                $user->profile_banner_path,
+            ]) as $path) {
+                $ids[] = $cleanup->remember(
+                    $cleanup->imageDisk($path),
+                    $path,
+                );
+            }
+
+            $documents = DB::table('profile_documents')
+                ->where('user_id', $userId)
+                ->get(['path']);
+
+            foreach ($documents as $document) {
+                $ids[] = $cleanup->remember(
+                    'profile_documents',
+                    $document->path,
+                );
+            }
+
+            $user->delete();
+
+            return $ids;
+        });
 
         Auth::logout();
 
-        $user->delete($user->id);
-
         $request->session()->invalidate();
         $request->session()->regenerateToken();
+
+        foreach ($deletionIds as $id) {
+            $cleanup->attempt($id);
+        }
 
         return redirect('/');
     }

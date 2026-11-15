@@ -6,6 +6,15 @@ import laravel from 'laravel-vite-plugin';
 import { defineConfig } from 'vite';
 
 export default defineConfig({
+    resolve: {
+        dedupe: [
+            'vue',
+            '@vue/runtime-core',
+            '@vue/runtime-dom',
+            '@vue/reactivity',
+            '@vue/shared',
+        ],
+    },
     plugins: [
         laravel({
             input: ['resources/css/app.css', 'resources/js/app.ts'],
