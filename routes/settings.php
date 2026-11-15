@@ -6,17 +6,20 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Admin\Settings\UserSettingsController;
 use App\Http\Controllers\Admin\Settings\CompanySettingsController;
 use App\Http\Controllers\Admin\Settings\EmployeeSettingsController;
-
+use App\Http\Controllers\Settings\ProfileImageController;
+use App\Http\Controllers\Settings\ProfileDocumentController;
 
 
 
 Route::middleware(['auth'])->group(function () {
     Route::redirect('settings', '/settings/profile');
     Route::get('settings/profile', [ProfileController::class, 'edit'])->name('profile.edit');
-    Route::patch(
-    'settings/profile',
-    [ProfileController::class, 'update'],
-)->name('profile.update');
+    Route::patch('settings/profile',[ProfileController::class, 'update'],)->name('profile.update');
+    Route::post('settings/profile/image',[ProfileImageController::class, 'store'],)->middleware('throttle:10,1')->name('profile.image.store');
+    Route::post('settings/profile/documents', [ProfileDocumentController::class, 'store'],)->middleware('throttle:10,1')->name('profile.documents.store');
+    Route::get('settings/profile/documents/{document}',[ProfileDocumentController::class, 'show'],)->whereNumber('document')->name('profile.documents.show');
+    Route::delete('settings/profile/documents/{document}',[ProfileDocumentController::class, 'destroy'],)->whereNumber('document')->name('profile.documents.destroy');
+
 });
 
 Route::middleware(['auth', 'verified'])->group(function () {

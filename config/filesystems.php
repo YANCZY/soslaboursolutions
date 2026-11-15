@@ -38,6 +38,24 @@ return [
             'report' => false,
         ],
 
+        'profile_documents' => [
+            'driver' => 'local',
+            'root' => storage_path('app/private/profile-documents'),
+            'visibility' => 'private',
+            'throw' => true,
+            'report' => true,
+        ],
+
+        'profile_images' => [
+            'driver' => 'local',
+            'root' => storage_path('app/public/profile-images'),
+            'url' => rtrim(env('APP_URL', 'http://localhost'), '/')
+                .'/storage/profile-images',
+            'visibility' => 'public',
+            'throw' => true,
+            'report' => true,
+        ],
+
         'public' => [
             'driver' => 'local',
             'root' => storage_path('app/public'),

@@ -26,3 +26,6 @@ yarn-error.log
 /.nova
 /.vscode
 /.zed
+/public/user-profile-image/*
+!/public/user-profile-image/.gitignore
+!/public/user-profile-image/.htaccess

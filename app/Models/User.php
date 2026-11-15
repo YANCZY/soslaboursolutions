@@ -18,6 +18,7 @@ use App\Models\Attendance;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\Storage;
 
 
 #[Fillable(['first_name', 'last_name', 'user_type_id', 'client_id', 'email', 'password', 'status', 'phone', 'mobile'])]
@@ -42,7 +43,38 @@ class User extends Authenticatable implements MustVerifyEmail
      *
      * @var list<string>
      */
-    protected $appends = ['name'];
+    protected $appends = ['name', 'avatar', 'profile_banner_url'];
+
+    protected function avatar(): Attribute
+    {
+        return Attribute::make(
+            get: fn (): string => $this->profileImageUrl(
+                $this->profile_photo_path,
+            ),
+        );
+    }
+
+    protected function profileBannerUrl(): Attribute
+    {
+        return Attribute::make(
+            get: fn (): string => $this->profileImageUrl(
+                $this->profile_banner_path,
+            ),
+        );
+    }
+
+    private function profileImageUrl(?string $path): string
+    {
+        if (! $path) {
+            return '';
+        }
+
+        $disk = str_starts_with($path, 'profile-images/')
+            ? 'public'
+            : 'profile_images';
+
+        return Storage::disk($disk)->url($path);
+    }
 
     /**
      * Get the attributes that should be cast.

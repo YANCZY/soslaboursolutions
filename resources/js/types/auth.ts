@@ -8,6 +8,7 @@ export type User = {
     mobile?: string | null;
     status: 'active' | 'inactive' | 'pending';
     avatar?: string;
+    profile_banner_url?: string;
     email_verified_at: string | null;
     created_at: string;
     updated_at: string;
