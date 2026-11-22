@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin\Settings;
 use App\Http\Controllers\Controller;
 use App\Jobs\EmailSending\SendAccountAccessLink;
 use App\Models\User;
+use App\Services\DeletePendingUser;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Http\RedirectResponse;
 use Inertia\Inertia;
@@ -268,6 +269,15 @@ class UserSettingsController extends Controller
 
 
     }
+
+    public function destroy(Request $request, User $user,DeletePendingUser $deletePendingUser,): RedirectResponse
+    {
+        $deletePendingUser->handle($request->user(), $user);
+
+        return back();
+    }
+
+
 
     public function resendInvitation(User $user): RedirectResponse
     {

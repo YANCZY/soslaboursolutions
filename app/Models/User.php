@@ -19,14 +19,16 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\Storage;
+use Laravel\Passport\Contracts\OAuthenticatable;
+use Laravel\Passport\HasApiTokens;
 
 
 #[Fillable(['first_name', 'last_name', 'user_type_id', 'client_id', 'email', 'password', 'status', 'phone', 'mobile'])]
 #[Hidden(['password', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token'])]
-class User extends Authenticatable implements MustVerifyEmail
+class User extends Authenticatable implements MustVerifyEmail, OAuthenticatable
 {
     /** @use HasFactory<UserFactory> */
-    use HasFactory, Notifiable, TwoFactorAuthenticatable;
+    use HasApiTokens, HasFactory, Notifiable, TwoFactorAuthenticatable;
 
     protected static function booted(): void
     {
@@ -35,6 +37,19 @@ class User extends Authenticatable implements MustVerifyEmail
                 'travel_allowance' => 0,
                 'travel_allowance_currency' => 'AUD',
             ]);
+        });
+
+        static::updated(function (User $user): void {
+            if ($user->wasChanged([
+                'password',
+                'two_factor_secret',
+                'two_factor_confirmed_at',
+                'status',
+            ])) {
+                $user->tokens()
+                    ->where('name', 'like', 'SOS Mobile:%')
+                    ->update(['revoked' => true]);
+            }
         });
     }
 

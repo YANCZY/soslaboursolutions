@@ -61,6 +61,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
             Route::patch('settings/employee/{user}/toggle-status', [EmployeeSettingsController::class, 'toggleStatus'])
                 ->middleware('active-company:employee')
                 ->name('settings.employee.toggle-status');
+
+            Route::delete(
+                    'settings/employee/{user}',
+                    [EmployeeSettingsController::class, 'destroy'],
+                )
+                    ->whereNumber('user')
+                    ->name('settings.employee.destroy');
         });
 
 
@@ -99,6 +106,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
             Route::get('settings/company/{client}/location',[CompanySettingsController::class, 'companyLocation'],)->name('settings.company.location.show');
 
             Route::patch('settings/company/{client}/location',[CompanySettingsController::class, 'pinCompanyLocation'],)->name('settings.company.location.update');
+
+            Route::delete(
+                'settings/users/{user}',
+                [UserSettingsController::class, 'destroy'],
+            )
+                ->whereNumber('user')
+                ->name('settings.users.destroy');
         });
 
 

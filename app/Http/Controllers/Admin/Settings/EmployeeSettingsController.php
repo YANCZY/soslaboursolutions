@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Jobs\EmailSending\SendAccountAccessLink;
 use App\Models\User;
 use App\Models\UserType;
+use App\Services\DeletePendingUser;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -117,10 +118,19 @@ class EmployeeSettingsController extends Controller
             : back();
     }
 
-    public function resendInvitation(
-        User $user,
-        Request $request,
-    ): RedirectResponse {
+    public function destroy(Request $request,User $user, DeletePendingUser $deletePendingUser,): RedirectResponse
+    {
+        $deletePendingUser->handle(
+            $request->user(),
+            $user,
+            companyScoped: true,
+        );
+
+        return back();
+    }
+
+    public function resendInvitation(User $user, Request $request,): RedirectResponse
+    {
         abort_unless($user->client_id === $request->user()->client_id, 403);
 
         abort_unless(
