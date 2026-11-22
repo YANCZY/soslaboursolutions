@@ -4,6 +4,7 @@ import { Filter, Mail, Pencil, Plus, Search, User } from 'lucide-vue-next';
 import { computed, ref, watch } from 'vue';
 import { toast } from 'vue-sonner';
 import Heading from '@/components/Heading.vue';
+import PendingUserDeleteButton from '@/components/PendingUserDeleteButton.vue';
 import InputError from '@/components/InputError.vue';
 import { Button } from '@/components/ui/button';
 
@@ -668,28 +669,28 @@ class="h-8 gap-2 text-white hover:bg-red-700">
                     <table class="w-full min-w-[68rem] table-fixed text-sm">
                         <thead class="bg-muted text-left">
                             <tr>
-                                <th class="w-[13%] px-4 py-3 font-medium">
+                                <th class="w-[12%] px-4 py-3 font-medium">
                                     First name
                                 </th>
-                                <th class="w-[13%] px-4 py-3 font-medium">
+                                <th class="w-[12%] px-4 py-3 font-medium">
                                     Last name
                                 </th>
-                                <th class="w-[21%] px-4 py-3 font-medium">
+                                <th class="w-[19%] px-4 py-3 font-medium">
                                     Company
                                 </th>
-                                <th class="w-[21%] px-4 py-3 font-medium">
+                                <th class="w-[20%] px-4 py-3 font-medium">
                                     Email
                                 </th>
-                                <th class="w-[10%] px-4 py-3 font-medium">
+                                <th class="w-[9%] px-4 py-3 font-medium">
                                     Status
                                 </th>
-                                <th class="w-[8%] px-4 py-3 font-medium">
+                                <th class="w-[7%] px-4 py-3 font-medium">
                                     Phone
                                 </th>
-                                <th class="w-[8%] px-4 py-3 font-medium">
+                                <th class="w-[7%] px-4 py-3 font-medium">
                                     Mobile
                                 </th>
-                                <th class="w-[8%] px-4 py-3 text-center font-medium">
+                                <th class="w-[14%] px-4 py-3 text-center font-medium">
                                     Action
                                 </th>
                             </tr>
@@ -780,6 +781,11 @@ class="h-8 gap-2 text-white hover:bg-red-700">
                                         >
                                             <Mail class="size-4" />
                                         </button>
+
+                                        <PendingUserDeleteButton
+                                            :user="user"
+                                            endpoint="/settings/users"
+                                        />
                                     </div>
                                 </td>
                             </tr>
@@ -822,6 +828,11 @@ class="h-8 gap-2 text-white hover:bg-red-700">
                                 >
                                     <Mail class="size-4" />
                                 </button>
+
+                                <PendingUserDeleteButton
+                                    :user="user"
+                                    endpoint="/settings/users"
+                                />
 
                                 <button
                                     v-if="user.status === 'active' || user.status === 'inactive'"

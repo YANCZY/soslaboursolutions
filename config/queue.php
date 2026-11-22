@@ -35,6 +35,19 @@ return [
             'driver' => 'sync',
         ],
 
+        'user-invitations' => [
+        'driver' => 'database',
+
+        // Use the application's default database connection so the queued
+        // invitation and user creation share the same transaction.
+        'connection' => null,
+
+        'table' => 'jobs',
+        'queue' => 'default',
+        'retry_after' => 90,
+        'after_commit' => false,
+    ],
+
         'database' => [
             'driver' => 'database',
             'connection' => env('DB_QUEUE_CONNECTION'),

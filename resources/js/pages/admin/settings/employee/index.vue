@@ -4,6 +4,7 @@ import { Filter, Mail, Plus, Search, User } from 'lucide-vue-next';
 import { computed, ref, watch } from 'vue';
 import { toast } from 'vue-sonner';
 import Heading from '@/components/Heading.vue';
+import PendingUserDeleteButton from '@/components/PendingUserDeleteButton.vue';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -267,28 +268,28 @@ title="Users"
                     <table class="w-full min-w-[68rem] table-fixed text-sm">
                         <thead class="bg-muted text-left">
                             <tr>
-                                <th class="w-[13%] px-4 py-3 font-medium">
+                                <th class="w-[12%] px-4 py-3 font-medium">
                                     First name
                                 </th>
-                                <th class="w-[13%] px-4 py-3 font-medium">
+                                <th class="w-[12%] px-4 py-3 font-medium">
                                     Last name
                                 </th>
-                                <th class="w-[21%] px-4 py-3 font-medium">
+                                <th class="w-[19%] px-4 py-3 font-medium">
                                     Company
                                 </th>
-                                <th class="w-[21%] px-4 py-3 font-medium">
+                                <th class="w-[20%] px-4 py-3 font-medium">
                                     Email
                                 </th>
-                                <th class="w-[10%] px-4 py-3 font-medium">
+                                <th class="w-[9%] px-4 py-3 font-medium">
                                     Status
                                 </th>
-                                <th class="w-[8%] px-4 py-3 font-medium">
+                                <th class="w-[7%] px-4 py-3 font-medium">
                                     Phone
                                 </th>
-                                <th class="w-[8%] px-4 py-3 font-medium">
+                                <th class="w-[7%] px-4 py-3 font-medium">
                                     Mobile
                                 </th>
-                                <th class="w-[8%] px-4 py-3 text-center font-medium">
+                                <th class="w-[14%] px-4 py-3 text-center font-medium">
                                     Action
                                 </th>
                             </tr>
@@ -323,29 +324,38 @@ title="Users"
                                 </td>
 
                                 <td class="px-4 py-3 text-center">
-                                    <button type="button"
-                                        v-if="user.status === 'active' || user.status === 'inactive'"
-                                        class="inline-flex size-8 items-center justify-center rounded-md border transition-all"
-                                        :class="user.status === 'active'
-                                            ? 'border-border bg-muted text-foreground shadow-inner ring-1 ring-border'
-                                            : 'border-border bg-background text-muted-foreground shadow-sm hover:bg-muted/60 hover:text-foreground'
-    " :title="user.status === 'active' ? 'Deactivate user' : 'Activate user'"
-                                        :aria-label="user.status === 'active' ? 'Deactivate user' : 'Activate user'"
-                                        @click="toggleStatus(user)">
-                                        <User class="size-4" />
-                                    </button>
+                                    <div class="flex flex-nowrap items-center justify-center gap-2">
+                                        <button
+                                            v-if="user.status === 'active' || user.status === 'inactive'"
+                                            type="button"
+                                            class="inline-flex size-8 shrink-0 items-center justify-center rounded-md border transition-all"
+                                            :class="user.status === 'active'
+                                                ? 'border-border bg-muted text-foreground shadow-inner ring-1 ring-border'
+                                                : 'border-border bg-background text-muted-foreground shadow-sm hover:bg-muted/60 hover:text-foreground'"
+                                            :title="user.status === 'active' ? 'Deactivate user' : 'Activate user'"
+                                            :aria-label="user.status === 'active' ? 'Deactivate user' : 'Activate user'"
+                                            @click="toggleStatus(user)"
+                                        >
+                                            <User class="size-4" />
+                                        </button>
 
-                                    <button
-                                        v-if="user.status === 'pending'"
-                                        type="button"
-                                        class="inline-flex size-8 shrink-0 items-center justify-center rounded-md border border-border bg-background text-muted-foreground shadow-sm transition-all hover:bg-muted/60 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
-                                        title="Resend invitation email"
-                                        :aria-label="`Resend invitation email to ${user.first_name} ${user.last_name}`"
-                                        :disabled="resendingInvitationId !== null"
-                                        @click="resendInvitation(user)"
-                                    >
-                                        <Mail class="size-4" />
-                                    </button>
+                                        <button
+                                            v-if="user.status === 'pending'"
+                                            type="button"
+                                            class="inline-flex size-8 shrink-0 items-center justify-center rounded-md border border-border bg-background text-muted-foreground shadow-sm transition-all hover:bg-muted/60 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                                            title="Resend invitation email"
+                                            :aria-label="`Resend invitation email to ${user.first_name} ${user.last_name}`"
+                                            :disabled="resendingInvitationId !== null"
+                                            @click="resendInvitation(user)"
+                                        >
+                                            <Mail class="size-4" />
+                                        </button>
+
+                                        <PendingUserDeleteButton
+                                            :user="user"
+                                            endpoint="/settings/employee"
+                                        />
+                                    </div>
                                 </td>
                             </tr>
 
@@ -387,6 +397,11 @@ title="Users"
                                 >
                                     <Mail class="size-4" />
                                 </button>
+
+                                <PendingUserDeleteButton
+                                    :user="user"
+                                    endpoint="/settings/employee"
+                                />
 
                                 <button
                                     v-if="user.status === 'active' || user.status === 'inactive'"
